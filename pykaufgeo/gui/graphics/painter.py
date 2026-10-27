@@ -187,12 +187,22 @@ def paint_drawables(p: QPainter, drawables: list[Drawable], selected: set[str], 
     p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     for d in drawables:
         sel = d.label in selected
+        if d.ghost:
+            p.setOpacity(theme.GHOST_OPACITY)
         if sel or d.label == hovered:
             _halo(p, d, colors, strong=sel)
         if d.kind == "point":
             _points(p, d, sel)
+        elif d.kind == "text":
+            _text(p, d)
+        elif d.kind == "image":
+            _image(p, d)
+        elif d.kind == "slider":
+            _slider(p, d, sel)
         else:
             _shape(p, d, sel)
+        if d.ghost:
+            p.setOpacity(1.0)
     p.restore()
 
 
@@ -208,6 +218,20 @@ def _halo(p: QPainter, d: Drawable, colors: theme.ThemeColors, strong: bool) -> 
     """Yellow halo with a black outline (selection); a thin halo for hover."""
     edge, halo = QColor(colors.focus_edge), QColor(colors.selection_bg)
     extra = theme.HALO_WIDTH if strong else theme.HALO_WIDTH / 2
+    if d.rect is not None:
+        pad = theme.TEXT_PAD + extra / 2
+        r = d.rect.adjusted(-pad, -pad, pad, pad)
+        p.setPen(_pen(edge, theme.HALO_EDGE))
+        p.setBrush(QBrush(halo))
+        p.drawRect(r)
+        return
+    if d.kind == "slider":
+        r = d.radius + theme.POINT_OUTLINE + extra / 2
+        p.setPen(Qt.PenStyle.NoPen)
+        for color, rr in ((edge, r + theme.HALO_EDGE), (halo, r)):
+            p.setBrush(QBrush(color))
+            for pt in d.points:
+                p.drawEllipse(pt, rr, rr)
     if d.kind == "point":
         r = d.radius + theme.POINT_OUTLINE + extra / 2
         for color, rr in ((edge, r + theme.HALO_EDGE), (halo, r)):
@@ -255,6 +279,38 @@ def _shape(p: QPainter, d: Drawable, selected: bool) -> None:
         p.drawPolygon(d.head)
 
 
+def _text(p: QPainter, d: Drawable) -> None:
+    if d.rect is None or not d.text_lines:
+        return
+    if d.font is not None:
+        p.setFont(d.font)
+    p.setPen(d.label_color or d.color)
+    fm = QFontMetricsF(p.font())
+    y = d.rect.top()
+    for line in d.text_lines:
+        p.drawText(QRectF(d.rect.left(), y, d.rect.width() + fm.averageCharWidth(), fm.height()),
+                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, line)
+        y += fm.height()
+
+
+def _image(p: QPainter, d: Drawable) -> None:
+    if d.rect is None or d.pixmap is None:
+        return
+    p.drawPixmap(d.rect, d.pixmap, QRectF(d.pixmap.rect()))
+
+
+def _slider(p: QPainter, d: Drawable, selected: bool) -> None:
+    if d.path is not None:
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(_pen(d.edge or d.color, d.width, cap=Qt.PenCapStyle.SquareCap))
+        p.drawPath(d.path)
+    r = d.radius + (theme.SELECTION_EXTRA / 2 if selected else 0)
+    p.setPen(_pen(d.edge or d.color, theme.POINT_OUTLINE))
+    p.setBrush(QBrush(d.color))
+    for pt in d.points:
+        p.drawEllipse(pt, r, r)
+
+
 def _points(p: QPainter, d: Drawable, selected: bool) -> None:
     r = d.radius + (theme.SELECTION_EXTRA / 2 if selected else 0)
     pen = _pen(d.edge or d.color, theme.POINT_OUTLINE)
@@ -299,10 +355,12 @@ def paint_labels(p: QPainter, drawables: list[Drawable], font: QFont, colors: th
     fm = QFontMetricsF(font)
     occupied = occupied if occupied is not None else Occupied()
     for d in drawables:
-        if d.kind == "point":
+        if d.kind in ("point", "slider"):
             for pt in d.points:
                 r = d.radius + theme.POINT_OUTLINE
                 occupied.add((pt.x() - r, pt.y() - r, 2 * r, 2 * r))
+        elif d.rect is not None and d.kind == "text":
+            occupied.add((d.rect.x(), d.rect.y(), d.rect.width(), d.rect.height()))
     rects: dict[str, QRectF] = {}
     bounds: Rect = (0.0, 0.0, float(vp.width), float(vp.height))
     for d in drawables:
@@ -312,7 +370,9 @@ def paint_labels(p: QPainter, drawables: list[Drawable], font: QFont, colors: th
         ax, ay = d.anchor.x(), d.anchor.y()
         gap = theme.LABEL_GAP + (d.radius if d.kind == "point" else d.width)
         offset = (dragging or {}).get(d.label, d.label_offset)
-        if offset != (0, 0):
+        if d.kind == "slider":
+            r = (ax + offset[0], ay - gap - h + offset[1], w, h)
+        elif offset != (0, 0):
             r: Rect = (ax + gap + offset[0], ay - gap - h + offset[1], w, h)
         else:
             r = place_label(ax, ay, w, h, occupied, gap, bounds)

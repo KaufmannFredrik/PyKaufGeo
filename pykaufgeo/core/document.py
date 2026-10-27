@@ -13,7 +13,8 @@ from typing import Any, Callable, TypeVar
 from pykaufgeo.core.construction import Construction
 from pykaufgeo.core.events import DocumentChanged, EventBus, UndoStateChanged, ViewSettingsChanged
 from pykaufgeo.core.undo import DEFAULT_LIMIT, UndoManager
-from pykaufgeo.io.pkgeo import read_pkgeo, write_pkgeo
+from pykaufgeo.core.values import ImageValue
+from pykaufgeo.io.pkgeo import ASSET_NAME, read_pkgeo, read_pkgeo_assets, write_pkgeo
 
 T = TypeVar("T")
 
@@ -44,6 +45,7 @@ class Document:
         self.path: Path | None = None
         self.modified = False
         self.thumbnail: bytes | None = None
+        self.assets: dict[str, bytes] = {}  # pictures for Image objects (kept until the document is closed)
         self.undo = UndoManager(self.undo_state, self.restore_undo_state, undo_limit, self._undo_changed)
         self.undo.reset()
         self._action_description = ""
@@ -114,6 +116,10 @@ class Document:
         if self.undo.end(self._action_description):
             self._set_modified(True)
 
+    def abort_action(self) -> None:
+        """Cancel an open multi-event step (a tool cancelled half-way): nothing it did remains."""
+        self.undo.abort()
+
     @property
     def in_action(self) -> bool:
         return self.undo.in_transaction
@@ -157,6 +163,16 @@ class Document:
     def set_style(self, label: str, **changes: Any) -> None:
         self.run(f"Style {label}", lambda: self.construction.set_style(label, **changes))
 
+    def set_extras(self, label: str, **changes: Any) -> None:
+        self.run(f"Change {label}", lambda: self.construction.set_extras(label, **changes))
+
+    def set_caption(self, label: str, caption: str) -> None:
+        def action() -> None:
+            self.construction[label].caption = caption
+            self.construction.set_style(label)
+
+        self.run(f"Caption {label}", action)
+
     def do_undo(self) -> bool:
         ok = self.undo.undo()
         if ok:
@@ -169,6 +185,20 @@ class Document:
             self._set_modified(True)
         return ok
 
+    def add_asset(self, file_name: str, data: bytes) -> str:
+        """Store a picture; returns its name in the document (made unique and safe)."""
+        stem, dot, ext = Path(file_name).name.rpartition(".")
+        stem = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in (stem or "image"))[:60] or "image"
+        ext = ext.lower() if dot else "png"
+        name, k = f"{stem}.{ext}", 1
+        while (name in self.assets and self.assets[name] != data) or not ASSET_NAME.fullmatch(name):
+            k += 1
+            name = f"{stem}_{k}.{ext}"
+            if k > 10000:
+                raise ValueError("unsupported picture name")
+        self.assets[name] = data
+        return name
+
     # ------------------------------------------------------------------ files
     def new(self) -> None:
         self.views = default_views()
@@ -178,11 +208,13 @@ class Document:
         self.cas = {"rows": []}
         self.path = None
         self.thumbnail = None
+        self.assets = {}
         self.undo.reset()
         self._set_modified(False)
 
     def save(self, path: str | Path, thumbnail_png: bytes | None = None) -> Path:
-        out = write_pkgeo(path, self.snapshot(), thumbnail_png)
+        used = {el.value.asset for el in self.construction if isinstance(el.value, ImageValue)}
+        out = write_pkgeo(path, self.snapshot(), thumbnail_png, {k: v for k, v in self.assets.items() if k in used})
         self.path = out
         self.thumbnail = thumbnail_png
         self._set_modified(False)
@@ -191,6 +223,7 @@ class Document:
     def open(self, path: str | Path) -> list[str]:
         """Load a file. Returns messages for objects that could not be restored."""
         data, thumb = read_pkgeo(path)
+        self.assets = read_pkgeo_assets(path)
         errors = self.restore(data)
         self.path = Path(path)
         self.thumbnail = thumb

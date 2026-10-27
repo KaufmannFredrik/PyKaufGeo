@@ -60,6 +60,9 @@ COLOR_NAMES: dict[str, str] = {
     "ink": "ink",
 }
 
+# Colour choices offered by the style bar and Properties, in this order.
+SWATCH_TOKENS: tuple[str, ...] = ("ink", "blue", "red", "magenta", "green", "yellow", "black", "white")
+
 # Colours that must never be used for text on a light background.
 LOW_CONTRAST_ON_LIGHT: frozenset[str] = frozenset({"yellow", "green"})
 
@@ -144,7 +147,18 @@ LABEL_GAP = 6              # distance between an object and its label
 SNAP_PX = 10               # snapping radius to grid intersections
 HIT_TOLERANCE = 8          # pick distance around curves; points use max(radius, MIN_HIT / 2)
 PREVIEW_WIDTH = 2          # rubber-band previews of tools
-ZOOM_RECT_WIDTH = 2        # rectangle zoom outline
+ZOOM_RECT_WIDTH = 2        # rectangle zoom outline and selection rectangle
+ANGLE_RADIUS = 30          # radius of drawn angle sectors
+RIGHT_ANGLE_SIZE = 16      # side of the square marking a right angle
+SLIDER_WIDTH = 200         # default slider track length
+SLIDER_KNOB = 9            # slider knob radius
+SLIDER_TRACK = 3           # slider track stroke
+SLIDER_MARGIN = 24         # default slider position from the top-left corner
+SLIDER_SPACING = 48        # vertical distance between default slider positions
+TEXT_PAD = 4               # padding around texts in the Graphics view (hit area)
+GHOST_OPACITY = 0.35       # hidden objects while the Show / Hide Object tool is active
+PEN_WIDTH = 3              # Pen tool strokes
+TRACE_LIMIT = 4000         # traced drawables kept per view before the oldest are dropped
 # Dash patterns in multiples of the line width (Qt convention).
 DASH_PATTERNS: dict[str, tuple[float, ...]] = {"dash": (4.0, 3.0), "dot": (1.0, 2.0), "dashdot": (4.0, 2.0, 1.0, 2.0)}
 PREVIEW_DASH: tuple[float, ...] = (3.0, 3.0)
@@ -471,6 +485,14 @@ QSlider::handle:horizontal {{
     background: {c.bg}; border: {b}px solid {c.border}; }}
 QSlider::handle:horizontal:hover {{ background: {c.hover_bg}; }}
 QSlider::handle:horizontal:pressed {{ background: {c.pressed_bg}; }}
+
+/* ---------- tabs: square boxes sharing borders; the current tab is inverted ---------- */
+QTabWidget::pane {{ border: {b}px solid {c.border}; top: -{b}px; background: {c.bg}; }}
+QTabBar::tab {{
+    background: {c.bg}; color: {c.fg}; border: {b}px solid {c.border}; margin-right: -{b}px;
+    padding: {pad // 2}px {pad}px; min-height: {hit - 2 * b}px; font-weight: {FONT_WEIGHT_HEAVY}; }}
+QTabBar::tab:selected {{ background: {c.fg}; color: {c.bg}; }}
+QTabBar::tab:hover:!selected {{ background: {c.hover_bg}; color: {c.hover_fg}; }}
 
 /* ---------- scroll bars ---------- */
 QScrollBar:vertical {{ width: {sb}px; background: {c.bg}; border: {b}px solid {c.border}; margin: 0; }}

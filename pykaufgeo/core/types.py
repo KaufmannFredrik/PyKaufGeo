@@ -26,6 +26,8 @@ class GeoType(str, Enum):
     CURVE = "curve"
     IMPLICIT = "implicit"
     LOCUS = "locus"
+    ARC = "arc"
+    SECTOR = "sector"
     LIST = "list"
     MATRIX = "matrix"
     COMPLEX = "complex"
@@ -52,6 +54,7 @@ DISPLAY_NAMES: dict[GeoType, str] = {
     GeoType.CONIC: "Conic", GeoType.POLYGON: "Polygon", GeoType.POLYLINE: "Polyline",
     GeoType.FUNCTION: "Function", GeoType.FUNCTION_NVAR: "Multivariable Function",
     GeoType.CURVE: "Curve", GeoType.IMPLICIT: "Implicit Curve", GeoType.LOCUS: "Locus",
+    GeoType.ARC: "Arc", GeoType.SECTOR: "Sector",
     GeoType.LIST: "List", GeoType.MATRIX: "Matrix", GeoType.COMPLEX: "Complex Number",
     GeoType.INEQUALITY: "Inequality", GeoType.BUTTON: "Button", GeoType.INPUT_BOX: "Input Box",
     GeoType.IMAGE: "Image", GeoType.PLANE: "Plane", GeoType.SPHERE: "Sphere",
@@ -63,7 +66,7 @@ GRAPHICAL_2D: frozenset[GeoType] = frozenset({
     GeoType.POINT, GeoType.VECTOR, GeoType.LINE, GeoType.RAY, GeoType.SEGMENT,
     GeoType.CIRCLE, GeoType.CONIC, GeoType.POLYGON, GeoType.POLYLINE, GeoType.FUNCTION,
     GeoType.CURVE, GeoType.IMPLICIT, GeoType.LOCUS, GeoType.INEQUALITY, GeoType.ANGLE,
-    GeoType.COMPLEX,
+    GeoType.COMPLEX, GeoType.ARC, GeoType.SECTOR, GeoType.TEXT, GeoType.IMAGE,
 })
 
 # Types whose description is written "label: equation" rather than "label = value".

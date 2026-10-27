@@ -84,8 +84,11 @@ def test_intersections() -> None:
     assert not ev("Intersect(Segment((0, 0), (1, 1)), Segment((3, 0), (3, 5)))").is_defined()
     pts = ev("Intersect(x^2 / 4 + y^2 = 1, y = 0, 2)")
     assert approx_point(pts, 2, 0)
-    with pytest.raises(PKGError, match="M3|M4"):
-        ev("Intersect(x^2 - y^2 = 1, x^2 + y^2 = 4)")
+    # conic / conic: x² = 2.5, y² = 1.5
+    p = ev("Intersect(x^2 - y^2 = 1, x^2 + y^2 = 4, 1)")
+    assert abs(abs(p.x) - math.sqrt(2.5)) < 1e-9 and abs(abs(p.y) - math.sqrt(1.5)) < 1e-9
+    with pytest.raises(PKGError, match="M4"):
+        ev("Intersect(x^2 - y^2 = 1, x^3 + y^3 = 1)")
 
 
 def test_polygons_area_perimeter() -> None:
@@ -198,7 +201,7 @@ def test_registry_is_complete_and_documented() -> None:
         assert get_command(cmd.name.lower()) is cmd
         for s in cmd.signatures:
             for a in s.args:
-                assert a.type in ARG_TYPES or a.kind in ("lazy", "var")
+                assert a.type in ARG_TYPES or a.kind in ("lazy", "var", "label")
             assert s.syntax(cmd.name).startswith(cmd.name + "(")
 
 

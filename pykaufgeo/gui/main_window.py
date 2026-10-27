@@ -23,6 +23,7 @@ from pykaufgeo.core.document import Document
 from pykaufgeo.core.errors import PKGError
 from pykaufgeo.core.events import DocumentChanged, UndoStateChanged
 from pykaufgeo.gui.algebra.view import AlgebraView
+from pykaufgeo.gui.animation import Animator
 from pykaufgeo.gui.autocomplete import first_placeholder
 from pykaufgeo.gui.chrome import MessageBlock, brutal_menu_bar_menu
 from pykaufgeo.gui.dialogs import AboutDialog, ConfirmDialog, PreferencesDialog, ask_open_path, ask_save_path
@@ -91,8 +92,11 @@ class MainWindow(QMainWindow):
         self.input_bar.help_button.clicked.connect(self.show_command_help)
         self.algebra.deleted.connect(self.delete_labels)
         self.algebra.error.connect(self.show_error)
+        self.animator = Animator(self.document, self)
         for body in (self.graphics, self.graphics2):
             body.canvas.message.connect(self.message.show_message)
+            body.canvas.properties_requested.connect(self.show_properties)
+            body.bar.set_animator(self.animator)
         bus = self.document.bus
         self._unsubscribe = [bus.subscribe(UndoStateChanged, self._on_undo_state),
                              bus.subscribe(DocumentChanged, lambda e: self._update_title())]
@@ -225,7 +229,7 @@ class MainWindow(QMainWindow):
         m_edit.addAction(self._action(tr("Delete"), self.delete_selection, QKeySequence.StandardKey.Delete))
         m_edit.addAction(self._action(tr("Select All"), self.select_all, QKeySequence.StandardKey.SelectAll))
         m_edit.addSeparator()
-        m_edit.addAction(self._action(tr("Properties...  (M3)"), enabled=False))
+        m_edit.addAction(self._action(tr("Properties..."), lambda: self.show_properties(), "Ctrl+E"))
 
         m_view = brutal_menu_bar_menu(bar, tr("&View"))
         for spec in VIEWS:
@@ -405,6 +409,18 @@ class MainWindow(QMainWindow):
             self.document.end_action()
         if removed:
             self.message.show_message("info", tr("Deleted") + ": " + ", ".join(removed))
+
+    def show_properties(self, labels: list | None = None) -> None:
+        """Object Properties for the given objects (default: the selection)."""
+        from pykaufgeo.gui.properties import PropertiesDialog
+
+        c = self.document.construction
+        labels = [lab for lab in (labels if labels is not None else self.selection.labels) if lab in c]
+        if not labels:
+            self.message.show_message("info", tr("Select an object first, then open Properties."))
+            return
+        self._properties_dialog = PropertiesDialog(self.document, labels, self)
+        self._properties_dialog.exec()
 
     def select_all(self) -> None:
         self.selection.set(list(self.document.construction.order))

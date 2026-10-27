@@ -248,7 +248,7 @@ class AlgebraView(QWidget):
 
     def toggle_visibility(self, label: str) -> None:
         el = self.document.construction.get(label)
-        if el is None or not shows_in_graphics(el.geo_type):
+        if el is None or not shows_in_graphics(el):
             return
         shown = set(el.style.visible_in)
         views = shown & {"g1", "g2"}

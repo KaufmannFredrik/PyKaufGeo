@@ -11,6 +11,7 @@ from pykaufgeo.core.types import GeoType
 from pykaufgeo.core.values import (
     EPS,
     Angle,
+    ArcValue,
     Circle,
     Conic,
     Line,
@@ -108,6 +109,12 @@ def _coeffs(v: Circle | Conic) -> tuple[float, ...]:
     return v.coefficients()
 
 
+def _on_arc(arc: ArcValue, p: Point) -> bool:
+    a = math.atan2(p.y - arc.center.y, p.x - arc.center.x)
+    rel = (a - arc.start) % (2 * math.pi) if arc.sweep >= 0 else (arc.start - a) % (2 * math.pi)
+    return rel <= abs(arc.sweep) + 1e-9
+
+
 def _pad(points: list[Point], n: int) -> tuple[Point, ...]:
     return tuple(points[:n]) + tuple(NAN_POINT for _ in range(n - len(points)))
 
@@ -134,7 +141,18 @@ class Intersect(Command):
             return _pad(pts, 2)
         if isinstance(a, Circle) and isinstance(b, Circle):
             return _pad(intersect_circles(a, b), 2)
-        raise CommandError("Intersect of these object types arrives in M3 (conics) and M4 (functions, curves).")
+        if isinstance(a, (Circle, Conic)) and isinstance(b, (Circle, Conic)):
+            from pykaufgeo.core.conics import intersect_conics
+
+            return _pad([Point(x, y) for x, y in intersect_conics(_coeffs(a), _coeffs(b))], 4)
+        if isinstance(b, linear) and isinstance(a, ArcValue):
+            a, b = b, a
+        if isinstance(a, linear) and isinstance(b, ArcValue):
+            full = Circle(b.center, b.r)
+            pts = [p for p in intersect_line_conic(as_line(a), full.coefficients())
+                   if _param_ok(a, p) and _on_arc(b, p)]
+            return _pad(pts, 2)
+        raise CommandError("Intersect of these object types arrives in M4 (functions, curves).")
 
     @sig("<Object>", "<Object>", returns=P)
     def pair(self, call, a: Any, b: Any) -> Any:
@@ -225,6 +243,10 @@ class Segment_(Command):
     @sig("<Point>", "<Point>", returns=GeoType.SEGMENT)
     def two_points(self, call, a: Point, b: Point) -> Segment:
         return Segment(a, b)
+
+    @sig("<Point>", "<Length:Number>", returns=GeoType.SEGMENT)
+    def length(self, call, a: Point, length: float) -> Segment:
+        return Segment(a, Point(a.x + length, a.y))
 
 
 @register
@@ -344,6 +366,22 @@ class Polygon_(Command):
     def from_list(self, call, items: ListValue) -> Polygon:
         return Polygon(_points(items))
 
+    @sig("<Point>", "<Point>", "<Number of Vertices:Integer>", returns=GeoType.POLYGON)
+    def regular(self, call, a: Point, b: Point, n: int) -> Polygon:
+        """Regular polygon with side AB, built counterclockwise."""
+        if n < 3 or n > 1000:
+            return Polygon((NAN_POINT, NAN_POINT, NAN_POINT))
+        vx, vy = b.x - a.x, b.y - a.y
+        pts = [a]
+        x, y = a.x, a.y
+        for k in range(n - 1):
+            ang = 2 * math.pi * k / n
+            dx = vx * math.cos(ang) - vy * math.sin(ang)
+            dy = vx * math.sin(ang) + vy * math.cos(ang)
+            x, y = x + dx, y + dy
+            pts.append(Point(x, y))
+        return Polygon(tuple(pts))
+
 
 @register
 class Polyline_(Command):
@@ -458,16 +496,41 @@ class Slope(Command):
         return -line.a / line.b
 
 
-def _ccw(dx1: float, dy1: float, dx2: float, dy2: float) -> Angle:
+def _ccw(dx1: float, dy1: float, dx2: float, dy2: float, vertex: tuple[float, float] | None = None) -> Angle:
+    """Counterclockwise angle from the first direction to the second.
+
+    With ``vertex`` the angle also remembers where it sits (``vertex``, ``start``),
+    so the Graphics view can draw it as a sector.
+    """
     if (dx1 == 0 and dy1 == 0) or (dx2 == 0 and dy2 == 0):
         return Angle(math.nan)
     ang = math.atan2(dx1 * dy2 - dy1 * dx2, dx1 * dx2 + dy1 * dy2)
-    return Angle(ang % (2 * math.pi))
+    out = Angle(ang % (2 * math.pi))
+    if vertex is not None and all(math.isfinite(v) for v in vertex):
+        out.vertex = vertex  # type: ignore[attr-defined]
+        out.start = math.atan2(dy1, dx1)  # type: ignore[attr-defined]
+    return out
+
+
+def polygon_angles(poly: Polygon) -> list[Angle]:
+    """Interior angles, in vertex order."""
+    vs = poly.vertices
+    n = len(vs)
+    ccw = poly.signed_area > 0
+    out = []
+    for k in range(n):
+        v, prev, nxt = vs[k], vs[k - 1], vs[(k + 1) % n]
+        if ccw:
+            out.append(_ccw(nxt.x - v.x, nxt.y - v.y, prev.x - v.x, prev.y - v.y, (v.x, v.y)))
+        else:
+            out.append(_ccw(prev.x - v.x, prev.y - v.y, nxt.x - v.x, nxt.y - v.y, (v.x, v.y)))
+    return out
 
 
 @register
 class Angle_(Command):
     name = "Angle"
+    multi_output = True
     category = CAT
     description = ("Angle measured counterclockwise: Angle(A, B, C) at apex B from BA to BC; "
                    "between two vectors or two lines; or a number turned into an angle.")
@@ -475,15 +538,27 @@ class Angle_(Command):
 
     @sig("<Point>", "<Apex:Point>", "<Point>", returns=A)
     def three_points(self, call, a: Point, b: Point, c: Point) -> Angle:
-        return _ccw(a.x - b.x, a.y - b.y, c.x - b.x, c.y - b.y)
+        return _ccw(a.x - b.x, a.y - b.y, c.x - b.x, c.y - b.y, (b.x, b.y))
 
     @sig("<Vector>", "<Vector>", returns=A)
     def vectors(self, call, u: Vector, v: Vector) -> Angle:
-        return _ccw(u.x, u.y, v.x, v.y)
+        s = u.start or Point(0.0, 0.0)
+        return _ccw(u.x, u.y, v.x, v.y, (s.x, s.y))
 
     @sig("<Line>", "<Line>", returns=A)
     def lines(self, call, g: Any, h: Any) -> Angle:
-        return _ccw(*as_line(g).direction, *as_line(h).direction)
+        l1, l2 = as_line(g), as_line(h)
+        x = intersect_lines(l1, l2)
+        return _ccw(*l1.direction, *l2.direction, (x.x, x.y) if x.is_defined() else None)
+
+    @sig("<Polygon>", returns=A)
+    def polygon(self, call, poly: Polygon) -> MultiOutput:
+        return MultiOutput(tuple(polygon_angles(poly)))
+
+    @sig("<Polygon>", "<Index:Integer>", returns=A)
+    def polygon_k(self, call, poly: Polygon, k: int) -> Angle:
+        angles = polygon_angles(poly)
+        return angles[k - 1] if 1 <= k <= len(angles) else Angle(math.nan)
 
     @sig("<Vector>", returns=A)
     def vector(self, call, v: Vector) -> Angle:

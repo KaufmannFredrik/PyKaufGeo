@@ -3,10 +3,12 @@
 Dynamic geometry, graphing, CAS, 3D, spreadsheet and probability in one linked
 construction, written in Python with PySide6. Brutalist interface.
 
-Status: milestones M0 to M2 are done (application shell, core model, parser,
-evaluator, undo/redo, files, two 2D graphics views with the first tools, the
-Algebra view with LaTeX, and an input bar with autocomplete and command help). See `PLAN.md` for the roadmap and `FEATURES.md` for
-the honest feature checklist.
+Status: milestones M0 to M3 are done (application shell, core model, parser,
+evaluator, undo/redo, files, two 2D graphics views, the Algebra view with LaTeX, an
+input bar with autocomplete and command help, and the geometry tool set: points on
+objects, intersections, polygons, conics, arcs, angles, transformations, locus,
+sliders with animation, texts, images, pen, a style bar and the Properties dialog).
+See `PLAN.md` for the roadmap and `FEATURES.md` for the honest feature checklist.
 
 ## Run
 

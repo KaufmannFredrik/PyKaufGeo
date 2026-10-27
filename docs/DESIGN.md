@@ -268,3 +268,78 @@ template in the input bar.
 #### Graphics context menu (`m2_graphics_context_menu.png`)
 ![context](screenshots/m2_graphics_context_menu.png)
 Right-click: axes, grid, ratio lock, standard view, show all. Right-drag zooms to a rectangle.
+
+## 7. M3: tools, objects, properties
+
+### New tokens
+
+| Token | Value | Where |
+|---|---|---|
+| `ANGLE_RADIUS`, `RIGHT_ANGLE_SIZE` | 30 px, 16 px | angle sectors; the square for right angles |
+| `SLIDER_WIDTH`, `SLIDER_KNOB`, `SLIDER_TRACK` | 200 px, 9 px, 3 px | slider track and knob (knob: object colour, 3 px ink edge) |
+| `SLIDER_MARGIN`, `SLIDER_SPACING` | 24 px, 48 px | default slider positions, stacked from the top left |
+| `TEXT_PAD` | 4 px | hit area and halo around texts and images |
+| `GHOST_OPACITY` | 0.35 | hidden objects while Show / Hide Object is active |
+| `PEN_WIDTH` | 3 px | pen strokes |
+| `SWATCH_TOKENS` | ink, blue, red, magenta, green, yellow, black, white | colour choices in the style bar and Properties |
+
+### Rules
+
+* Angles are filled sectors at 40 % with a 2 px ink edge; a right angle is a square.
+  The label sits outside the sector on its bisector.
+* Sliders: 3 px ink track, knob in the object colour with a 3 px ink edge, label
+  `a = 2.5` above the left end. The knob changes the value (snapping to the
+  increment); the track moves the slider unless it is fixed.
+* Texts use the bold UI font in the object colour (ink if the colour is below 4.5:1).
+  Selected texts and images get a yellow box with a black edge.
+* The style bar has icon buttons only, square and self-drawn; it is greyed out without
+  a selection but never hidden, so the canvas does not jump.
+* Properties: square tabs sharing borders, the current tab inverted; tabs never
+  scroll (the dialog widens instead); errors appear in a red block above CLOSE.
+  Object names keep their case in titles (`c` and `C` are different objects).
+* Spin boxes get their text inset in code (Fusion ignores QSS padding there).
+
+### Screenshots (M3)
+
+#### Main window (`screenshots/m3_main.png`)
+![m3 main](screenshots/m3_main.png)
+1. Triangle `t1` with its angle `α` (sector at A) and its reflection `t1'` in `g: x = -2.5`.
+2. Ellipse `el` (selected: yellow halo with black edge), point `P` on it and the
+   tangent at `P`, printed `y = 5.24`.
+3. `M` on circle `c`, `Q` the midpoint of `M` and (5, -3); the magenta locus of `Q`
+   and the segment `MQ` rotated about `Q`.
+4. Slider `a` at the top left; a text placed in the view; a circular sector.
+5. The style bar under the view bar: colour, line, point, label, properties.
+
+#### Night, high contrast, 20 pt (`m3_night.png`, `m3_high_contrast.png`, `m3_font_20pt.png`)
+![m3 night](screenshots/m3_night.png)
+![m3 contrast](screenshots/m3_high_contrast.png)
+High contrast draws magenta as blue (the locus) and green as ink (the angle fill).
+![m3 20pt](screenshots/m3_font_20pt.png)
+At 20 pt the style bar still fits (icons); the grid combo gives way first.
+
+#### Tools in action (`m3_polygon_preview.png`, `m3_show_hide_tool.png`)
+![polygon preview](screenshots/m3_polygon_preview.png)
+Polygon tool after two vertices: dashed preview to the cursor, new vertices selected.
+![show hide](screenshots/m3_show_hide_tool.png)
+Show / Hide Object: the hidden reflection `t1'` is drawn faintly so it can be clicked
+back; its Algebra box is hollow with a slash.
+
+#### Menus (`m3_object_menu.png`, `m3_style_menu.png`)
+![object menu](screenshots/m3_object_menu.png)
+Right-click on an object: a disabled heading with type and name, check items for
+show, label, trace, animation (sliders and points on objects) and fix, then rename,
+delete, properties.
+![style menu](screenshots/m3_style_menu.png)
+
+#### Properties (`m3_dialog_properties*.png`)
+![properties](screenshots/m3_dialog_properties.png)
+![properties style](screenshots/m3_dialog_properties_style.png)
+Point size and style are disabled for a conic (they do not apply).
+![properties slider](screenshots/m3_dialog_properties_slider.png)
+![properties 20pt](screenshots/m3_dialog_properties_20pt.png)
+![properties night](screenshots/m3_dialog_properties_night.png)
+
+#### Prompts (`m3_dialog_slider.png`, `m3_dialog_text.png`)
+![slider dialog](screenshots/m3_dialog_slider.png)
+![text dialog](screenshots/m3_dialog_text.png)

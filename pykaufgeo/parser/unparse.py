@@ -178,8 +178,7 @@ class _Printer:
         if op == "^":
             left = self.wrap(node.left, lp <= prec)
             if self.display and isinstance(node.right, Num) and isinstance(node.right.value, float) \
-                    and node.right.value == int(node.right.value) and 0 <= node.right.value < 100 \
-                    and lp > prec:
+                    and node.right.value == int(node.right.value) and 0 <= node.right.value < 100:
                 return left + str(int(node.right.value)).translate(SUPERSCRIPTS)
             frac = _simple_fraction(node.right) if self.display else None
             if frac is not None:

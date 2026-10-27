@@ -26,13 +26,12 @@ class ToolGroup:
     tools: tuple[ToolSpec, ...]
 
 
-# Tools that work; every other tool says "not implemented yet" when chosen.
-IMPLEMENTED = frozenset({"move", "move_view", "zoom_in", "zoom_out", "point", "line", "circle_center_point",
-                         "delete"})
+# Milestones whose tools all work; every other tool says "not implemented yet" when chosen.
+DONE_MILESTONES = frozenset({"M2", "M3"})
 
 
 def _t(id_: str, name: str, help_: str, milestone: str) -> ToolSpec:
-    return ToolSpec(id_, name, help_, milestone, id_ in IMPLEMENTED)
+    return ToolSpec(id_, name, help_, milestone, milestone in DONE_MILESTONES)
 
 
 TOOL_GROUPS: tuple[ToolGroup, ...] = (
@@ -42,7 +41,7 @@ TOOL_GROUPS: tuple[ToolGroup, ...] = (
         _t("freehand", "Freehand Shape", "Sketch a function or geometric object", "M3"),
     )),
     ToolGroup("point", "Point", (
-        _t("point", "Point", "Click to create a free point (snaps to the grid); attaching to objects in M3", "M2"),
+        _t("point", "Point", "Click on the Graphics View, an object or an intersection", "M2"),
         _t("point_on_object", "Point on Object", "Click inside an object or on its boundary", "M3"),
         _t("attach_detach", "Attach / Detach Point", "Select point, then object to attach it to", "M3"),
         _t("intersect", "Intersect", "Select intersecting objects or click their intersection", "M3"),

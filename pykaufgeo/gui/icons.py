@@ -558,6 +558,33 @@ def _delete(c: _Canvas) -> None:
     c.line(26, 6, 6, 26)
 
 
+# ---- style bar
+
+def _style_color(c: _Canvas) -> None:
+    c.rect(4.5, 4.5, 23, 23)
+    c.lines([(4.5, 27.5), (27.5, 4.5), (27.5, 27.5)], fill=True)
+
+
+def _style_line(c: _Canvas) -> None:
+    for y, w in ((7.0, 1.5), (15.0, 3.0), (24.0, 6.0)):
+        pen = QPen(c.pen)
+        pen.setWidthF(w)
+        c.p.setPen(pen)
+        c.line(4, y, 28, y)
+    c.p.setPen(c.pen)
+
+
+def _style_point(c: _Canvas) -> None:
+    c.point(9, 16, 3.5)
+    c.point(22, 16, 6.5)
+
+
+def _properties(c: _Canvas) -> None:
+    for y in (7.5, 16.5, 25.5):
+        c.rect(3.5, y - 2.5, 5, 5, fill=True)
+        c.line(12, y, 28, y)
+
+
 def _undo(c: _Canvas) -> None:
     c.arc(17, 19, 9, 0, 180)
     c.line(26, 19, 26, 24)
@@ -610,6 +637,8 @@ ICONS: dict[str, Callable[[_Canvas], None]] = {
     "show_hide_object": _show_hide_object, "show_hide_label": _show_hide_label,
     "copy_style": _copy_style, "delete": _delete,
     "undo": _undo, "redo": _redo, "close": _close, "logo": _logo,
+    "style_color": _style_color, "style_line": _style_line, "style_point": _style_point,
+    "style_label": _show_hide_label, "properties": _properties,
 }
 
 

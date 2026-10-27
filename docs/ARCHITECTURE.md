@@ -209,6 +209,44 @@ paintEvent:
   `commands.docs.help_entries()` (the registry).
 * `parser/latex.py` and `core/format_latex.py`: AST and value to the mathtext subset.
 
+## Geometry, tools and properties (M3)
+
+Model (Qt-free):
+
+* `core/conics.py`: canonical frame of a conic (`shape_of`), parameterisation,
+  projection, sampling for drawing, conic/conic intersection, conic through 5 points.
+* `core/paths.py`: objects a point can live on and their parameter (D-301).
+* `core/locus.py`: locus by re-evaluating the chain from mover to traced point (D-302).
+* `core/dragging.py`: `DragSession.start(construction, label, grab)` chooses free /
+  path / offset / parents / value / literal mode; `move_anchor(x, y)` (D-305).
+* `commands/transform.py` (affine maps on every value type), `commands/conics.py`,
+  `commands/pathcmds.py` (Point, Locus, Relation), `commands/control.py` (actions,
+  Slider; D-303).
+* `Construction`: `extras` per object (D-304), `perform` for actions, `set_values`,
+  `set_definition_node`, `place_on_path` / `set_path_param`, `evaluate_text`,
+  `add_text(text, state, extras)`. `Document`: `assets` (D-312), `abort_action`.
+
+GUI:
+
+```
+canvas.set_tool(id) -> tools.make_tool: Move, MoveView, Zoom, Point, Line, Circle, Delete
+                        -> tools_build.make_build_tool: pattern tools (D-307)
+                        -> tools_extra.make_extra_tool: vertex lists, rectangles,
+                           positions (text, image, slider), clicks, strokes
+canvas.pick_or_create_point -> placing.attach_point: intersection / point on object / free
+Scene.build(..., SceneContext(font, assets, lookup, show_hidden))
+    make_drawable -> shapes.make_extra: conics, arcs, angles, loci, texts, images,
+                     sliders, slope triangles
+paintEvent: base layer + trace layer (D-311) + live drawables + halos + tool preview
+```
+
+* `gui/properties.py`: Properties dialog; every control applies at once as one undo
+  step for all its objects.
+* `gui/graphics/view.py`: view bar (axes, grid, ratio, play/pause) and style bar
+  (D-309). `GraphicsCanvas.object_menu` is the right-click menu of an object.
+* `gui/animation.py`: `Animator` (D-310), driven by `AnimationCommand` events and the
+  play button; `tick(dt)` is callable from tests.
+
 ## GUI (M0/M1)
 
 * `gui/app.py`: QApplication with Fusion, all UI effects off, font substitutions,

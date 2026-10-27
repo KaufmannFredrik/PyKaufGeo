@@ -283,6 +283,147 @@ def m2_jobs(out: Path) -> dict:
     }
 
 
+M3_INPUT = (
+    "A = (-7, 1)", "B = (-4, 1)", "C = (-5, 4)", "t1 = Polygon(A, B, C)", "α = Angle(B, A, C)",
+    "g: x = -2.5", "t1' = Reflect(t1, g)", "el = Ellipse((1, 3), (5, 3), 3)", "P = Point(el)",
+    "Tangent(P, el)", "c = Circle((1, -3), 1.5)", "M = Point(c)", "Q = Midpoint(M, (5, -3))", "loc = Locus(Q, M)",
+    "a = Slider(0, 5, 0.1)", "k = CircularSector((-7, -4), (-5, -4), (-7, -2))", "r = Rotate(Segment(M, Q), 90°, Q)",
+)
+
+
+def m3_document():
+    from pykaufgeo.core.document import Document
+
+    doc = Document(seed=1)
+    for line in M3_INPUT:
+        doc.execute(line)
+    c = doc.construction
+    c.place_on_path("P", 3, 6)
+    c.place_on_path("M", 2, -2)
+    text = c.add_text('"Drag M: Q traces the locus"', extras={"pos": [-1.5, -5.6]})[0]
+    c.set_style(text, visible_in=["g1"])
+    c.set_style("α", color="green")
+    doc.undo.reset()
+    return doc
+
+
+def m3_main(out: Path, name: str, prefs: Preferences | None = None, setup: Callable | None = None) -> Path:
+    def full_setup(app, win):
+        win.selection.set(["el"])
+        settle(app)
+        win.graphics.canvas.grab()
+        win.graphics.canvas.show_all()
+        settle(app)
+        if setup is not None:
+            setup(app, win)
+            settle(app)
+    return shot_main(out, name, prefs, (), full_setup, m3_document())
+
+
+def m3_overlay(out: Path, name: str, setup: Callable, prefs: Preferences | None = None) -> Path:
+    app, win = make_window(prefs, m3_document())
+    settle(app)
+    win.graphics.canvas.grab()
+    popup = setup(app, win)
+    popup.ensurePolished()
+    popup.resize(popup.sizeHint())
+    settle(app)
+    pos = win.mapFromGlobal(popup.pos())
+    path = out / f"{name}.png"
+    compose(win.grab(), [(popup, pos)]).save(str(path))
+    win.document.modified = False
+    win.close()
+    return path
+
+
+def m3_dialog(out: Path, name: str, factory: Callable, prefs: Preferences | None = None, tab: int = 0) -> Path:
+    app, win = make_window(prefs, m3_document())
+    dlg = factory(win)
+    dlg.show()  # tab pages are laid out only when shown
+    settle(app)
+    if hasattr(dlg, "tabs"):
+        dlg.tabs.setCurrentIndex(tab)
+    dlg.ensurePolished()
+    dlg.adjustSize()
+    dlg.resize(dlg.sizeHint())
+    settle(app)
+    pos = QPoint((win.width() - dlg.width()) // 2, (win.height() - dlg.height()) // 3)
+    path = out / f"{name}.png"
+    compose(win.grab(), [(dlg, pos)]).save(str(path))
+    win.document.modified = False
+    win.close()
+    return path
+
+
+def m3_jobs(out: Path) -> dict:
+    from pykaufgeo.gui.dialogs import SliderDialog, TextPromptDialog
+    from pykaufgeo.gui.properties import PropertiesDialog
+
+    def object_menu(app, win):
+        canvas = win.graphics.canvas
+        win.selection.set(["M"])
+        menu = canvas.object_menu("M")
+        p = canvas.mapToGlobal(canvas.rect().center())
+        menu.move(p)
+        win._shot_menu = menu
+        return menu
+
+    def style_menu(app, win):
+        win.selection.set(["el"])
+        settle(app)
+        bar = win.graphics.style_bar
+        menu = bar.build_menu("color")
+        b = bar.buttons["color"]
+        menu.move(b.mapToGlobal(b.rect().bottomLeft()))
+        win._shot_menu = menu
+        return menu
+
+    def show_hide(app, win):
+        win.document.set_style("t1'", visible_in=[])
+        win.toolbar.select_tool("show_hide_object")
+
+    def polygon_preview(app, win):
+        from PySide6.QtCore import QPointF
+        from PySide6.QtGui import QMouseEvent
+        from PySide6.QtCore import QEvent
+
+        win.toolbar.select_tool("polygon")
+        canvas = win.graphics.canvas
+        for x, y in ((1, -6), (3, -5.5)):
+            pt = QPointF(canvas.vp.sx(x), canvas.vp.sy(y))
+            for kind in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
+                ev = QMouseEvent(kind, pt, QPointF(canvas.mapToGlobal(pt.toPoint())), Qt.MouseButton.LeftButton,
+                                 Qt.MouseButton.LeftButton if kind == QEvent.Type.MouseButtonPress else Qt.MouseButton.NoButton,
+                                 Qt.KeyboardModifier.NoModifier)
+                QApplication.sendEvent(canvas, ev)
+        cur = QPointF(canvas.vp.sx(2), canvas.vp.sy(-4))
+        QApplication.sendEvent(canvas, QMouseEvent(QEvent.Type.MouseMove, cur, QPointF(canvas.mapToGlobal(cur.toPoint())),
+                                                   Qt.MouseButton.NoButton, Qt.MouseButton.NoButton,
+                                                   Qt.KeyboardModifier.NoModifier))
+
+    def props(label: str):
+        return lambda w: PropertiesDialog(w.document, [label], w)
+
+    return {
+        "m3_main": lambda: m3_main(out, "m3_main"),
+        "m3_night": lambda: m3_main(out, "m3_night", Preferences(night=True)),
+        "m3_contrast": lambda: m3_main(out, "m3_high_contrast", Preferences(high_contrast=True)),
+        "m3_font": lambda: m3_main(out, "m3_font_20pt", Preferences(font_size=20)),
+        "m3_show_hide": lambda: m3_main(out, "m3_show_hide_tool", setup=show_hide),
+        "m3_polygon_preview": lambda: m3_main(out, "m3_polygon_preview", setup=polygon_preview),
+        "m3_object_menu": lambda: m3_overlay(out, "m3_object_menu", object_menu),
+        "m3_style_menu": lambda: m3_overlay(out, "m3_style_menu", style_menu),
+        "m3_props": lambda: m3_dialog(out, "m3_dialog_properties", props("el")),
+        "m3_props_style": lambda: m3_dialog(out, "m3_dialog_properties_style", props("el"), tab=2),
+        "m3_props_slider": lambda: m3_dialog(out, "m3_dialog_properties_slider", props("a"), tab=4),
+        "m3_props_font": lambda: m3_dialog(out, "m3_dialog_properties_20pt", props("el"), Preferences(font_size=20)),
+        "m3_props_night": lambda: m3_dialog(out, "m3_dialog_properties_night", props("el"), Preferences(night=True), 1),
+        "m3_slider_dialog": lambda: m3_dialog(out, "m3_dialog_slider", lambda w: SliderDialog("b", w)),
+        "m3_text_dialog": lambda: m3_dialog(out, "m3_dialog_text", lambda w: TextPromptDialog(
+            "Text", "Text", "Area of the triangle", w, multiline=True)),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT / "docs" / "screenshots"))
@@ -318,6 +459,7 @@ def main() -> int:
         "m1_night": lambda: shot_main(out, "m1_algebra_night", Preferences(night=True), document=sample_document()),
     }
     jobs.update(m2_jobs(out))
+    jobs.update(m3_jobs(out))
     names = args.only or list(jobs)
     for n in names:
         path = jobs[n]()

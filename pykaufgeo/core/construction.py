@@ -135,6 +135,10 @@ class Construction:
     def value(self, label: str) -> Any:
         return self[label].value
 
+    def value_or_none(self, label: str) -> Any:
+        el = self._el.get(label)
+        return None if el is None else el.value
+
     def _sorted(self, labels) -> list[str]:
         return sorted(labels, key=self._pos.__getitem__)
 
@@ -142,7 +146,9 @@ class Construction:
         return {n: e.geo_type for n, e in self._el.items()}
 
     def _ctx(self, label: str | None, state: dict) -> EvalContext:
-        return EvalContext(self._lookup, self._el.__contains__, state, self.rng, label, self.decimals)
+        ctx = EvalContext(self._lookup, self._el.__contains__, state, self.rng, label, self.decimals)
+        ctx.construction = self
+        return ctx
 
     def _lookup(self, name: str) -> Any:
         return self._el[name].value
@@ -151,10 +157,23 @@ class Construction:
     def execute(self, text: str) -> list[str]:
         """Input-bar semantics: create a new object, or redefine an existing label."""
         stmt = parse_statement(text)
+        if stmt.label is None and isinstance(stmt.expr, Call):
+            cmd = get_command(stmt.expr.name)
+            if cmd is not None and cmd.action:
+                self.perform(stmt.expr)
+                return []
         if stmt.label is not None and stmt.label in self._el:
             self.redefine(stmt.label, stmt)
             return [stmt.label]
         return self.add_statement(stmt)
+
+    def perform(self, expr: Node) -> str:
+        """Run an action command such as SetValue(a, 3) or ZoomIn(2)."""
+        resolved, _ = Resolver(self._types()).resolve(expr)
+        ctx = self._ctx(None, {})
+        ctx.allow_actions = True
+        result = self.evaluator.evaluate_definition(resolved, ctx)
+        return getattr(result, "message", "")
 
     def add(self, text: str) -> list[str]:
         """Create object(s); an existing label is an error (use redefine)."""
@@ -164,17 +183,41 @@ class Construction:
         return self.add_statement(stmt)
 
     def add_statement(self, stmt: Statement, *, type_hint: GeoType | None = None, style: Style | None = None,
-                      state: dict | None = None, caption: str = "", scripts: dict | None = None) -> list[str]:
+                      state: dict | None = None, caption: str = "", scripts: dict | None = None,
+                      extras: dict | None = None) -> list[str]:
         label, params = stmt.label, stmt.params
         if label is not None:
             self._validate_label(label)
         self._validate_params(params)
         expr, deps = Resolver(self._types()).resolve(stmt.expr, params or ())
-        return self._add_resolved(label, expr, deps, params, type_hint, style, state, caption, scripts)
+        if isinstance(expr, Call) and expr.name == "Slider" and not deps and not params:
+            return self._add_slider(label, expr, style, caption)
+        return self._add_resolved(label, expr, deps, params, type_hint, style, state, caption, scripts, extras)
+
+    def _add_slider(self, label: str | None, expr: Call, style: Style | None, caption: str) -> list[str]:
+        """``a = Slider(0, 10, 1)``: a free number with a slider (range kept in extras)."""
+        ctx = self._ctx(label, {})
+        value = self.evaluator.evaluate_definition(expr, ctx)
+        bounds = [float(self.evaluator.eval(a, self._ctx(label, {}), {})) for a in expr.args]
+        lo, hi = bounds[0], bounds[1]
+        step = bounds[2] if len(bounds) > 2 else (hi - lo) / 100
+        kind = geo_type_of(value)
+        if label is None:
+            label = next_label(kind, lambda n: n in self._el or n in CONSTANTS)
+        node, _ = value_to_node(value)
+        st = style or Style.default_for(kind, True)
+        if style is None:
+            st.visible_in = frozenset({"g1"})
+            st.label_visible, st.label_mode = True, "name_value"
+        el = GeoElement(label, node, None, frozenset(), value, kind, st, True, caption,
+                        extras={"slider": {"min": lo, "max": hi, "step": step}})
+        self._insert(el)
+        self.bus.emit(ElementsAdded((label,)))
+        return [label]
 
     def _add_resolved(self, label: str | None, expr: Node, deps: set[str], params: tuple[str, ...] | None,
                       type_hint: GeoType | None, style: Style | None, state: dict | None, caption: str,
-                      scripts: dict | None) -> list[str]:
+                      scripts: dict | None, extras: dict | None = None) -> list[str]:
         state = dict(state or {})
         value = self.evaluator.evaluate_definition(expr, self._ctx(label, state), params)
         if isinstance(value, MultiOutput):
@@ -193,7 +236,8 @@ class Construction:
             label = next_label(kind, lambda n: n in self._el or n in CONSTANTS)
         free = self._is_free(expr, deps)
         el = GeoElement(label, expr, params, frozenset(deps), value, kind,
-                        style or Style.default_for(kind, free), free, caption, state, None, dict(scripts or {}))
+                        style or Style.default_for(kind, free), free, caption, state, None, dict(scripts or {}),
+                        dict(extras or {}))
         self._insert(el)
         self.bus.emit(ElementsAdded((label,)))
         return [label]
@@ -372,10 +416,83 @@ class Construction:
         self.bus.emit(ElementsUpdated((label, *todo)))
         return todo
 
+    def set_values(self, changes: dict[str, Any]) -> list[str]:
+        """Change several free objects at once (dragging a segment moves both endpoints)."""
+        for label, value in changes.items():
+            el = self[label]
+            if not el.free:
+                raise EvalError(f"{label} depends on other objects and cannot be changed directly.")
+            value = coerce_to_type(value, el.geo_type)
+            el.value, el.expr, el.error = value, value_to_node(value)[0], None
+        todo = self._sorted(descendants(list(changes), self._children) - set(changes))
+        self._recompute(todo)
+        self.bus.emit(ElementsUpdated((*changes, *todo)))
+        return todo
+
+    def set_definition_node(self, label: str, node: Node) -> list[str]:
+        """Replace the definition of an object that depends on no other object (dragging it)."""
+        el = self[label]
+        if el.parents:
+            raise EvalError(f"{label} depends on other objects.")
+        old = el.expr
+        el.expr = node
+        try:
+            value = self._evaluate(el)
+        except PKGError:
+            el.expr = old
+            raise
+        el.value, el.error = coerce_to_type(value, el.geo_type), None
+        todo = self._sorted(descendants([label], self._children))
+        self._recompute(todo)
+        self.bus.emit(ElementsUpdated((label, *todo)))
+        return todo
+
+    def evaluate_node(self, node: Node) -> Any:
+        """Evaluate a resolved definition without storing it."""
+        return self.evaluator.evaluate_definition(node, self._ctx(None, {}))
+
+    def evaluate_text(self, text: str) -> Any:
+        """Evaluate an expression such as ``Intersect(f, g)`` without creating an object."""
+        resolved, _ = Resolver(self._types()).resolve(parse_expression(text))
+        return self.evaluate_node(resolved)
+
+    def add_text(self, text: str, state: dict | None = None, extras: dict | None = None) -> list[str]:
+        """Add a definition with initial state (a point's place on its object) or view data."""
+        return self.add_statement(parse_statement(text), state=state, extras=extras)
+
     def set_coords(self, label: str, x: float, y: float) -> list[str]:
         el = self[label]
         v = Vector(x, y) if el.geo_type is GeoType.VECTOR else Point(x, y)
         return self.set_value(label, v)
+
+    def set_extras(self, label: str, **changes: Any) -> None:
+        """Update view data (slider range/position, text position, ...); None removes a key."""
+        el = self[label]
+        extras = dict(el.extras)
+        for key, value in changes.items():
+            if value is None:
+                extras.pop(key, None)
+            else:
+                extras[key] = value
+        el.extras = extras
+        self.bus.emit(StyleChanged((label,)))
+
+    def place_on_path(self, label: str, x: float, y: float) -> list[str]:
+        """Move a point on an object to the object's point nearest (x, y)."""
+        from pykaufgeo.core import paths
+        from pykaufgeo.core.locus import is_path_point, path_value
+
+        if not is_path_point(self, label):
+            raise EvalError(f"{label} is not a point on an object.")
+        return self.set_path_param(label, paths.project(path_value(self, label), x, y))
+
+    def set_path_param(self, label: str, t: float) -> list[str]:
+        el = self[label]
+        el.state["param"] = float(t)
+        todo = [label, *self._sorted(descendants([label], self._children))]
+        self._recompute(todo)
+        self.bus.emit(ElementsUpdated(tuple(todo)))
+        return todo
 
     def set_style(self, label: str, **changes: Any) -> None:
         el = self[label]
@@ -453,6 +570,8 @@ class Construction:
                 item["state"] = el.state
             if el.scripts:
                 item["scripts"] = dict(el.scripts)
+            if el.extras:
+                item["extras"] = el.extras
             elements.append(item)
         return {"elements": elements, "settings": {"decimals": self.decimals}}
 
@@ -497,11 +616,13 @@ class Construction:
             hint = None
         state = item.get("state") if isinstance(item.get("state"), dict) else None
         scripts = item.get("scripts") if isinstance(item.get("scripts"), dict) else None
+        extras = item.get("extras") if isinstance(item.get("extras"), dict) else None
         caption = item.get("caption") if isinstance(item.get("caption"), str) else ""
         style = Style.from_dict(item["style"], Style.default_for(hint or GeoType.UNKNOWN, False)) \
             if isinstance(item.get("style"), dict) else None
         stmt = Statement(parse_expression(definition), label, tuple(params) if params else None, "assign")
-        self.add_statement(stmt, type_hint=hint, style=style, state=state, caption=caption, scripts=scripts)
+        self.add_statement(stmt, type_hint=hint, style=style, state=state, caption=caption, scripts=scripts,
+                           extras=extras)
 
 
 def value_to_node(value: Any) -> tuple[Node, tuple[str, ...] | None]:

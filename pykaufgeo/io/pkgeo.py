@@ -6,6 +6,7 @@ A zip archive containing:
   the document sections ``construction`` (objects, definitions, styles, state),
   ``views`` (view settings), ``spreadsheet`` (cells) and ``cas`` (rows).
 * ``thumbnail.png`` (optional): a picture of the Graphics view.
+* ``assets/<name>`` (optional): pictures used by Image objects.
 
 Older files are upgraded by the migration chain in ``MIGRATIONS``: a function
 registered for version *n* turns a version-*n* dictionary into version *n + 1*.
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +31,9 @@ DOCUMENT = "document.json"
 THUMBNAIL = "thumbnail.png"
 MAX_JSON_BYTES = 64 * 1024 * 1024
 MAX_THUMBNAIL_BYTES = 16 * 1024 * 1024
+ASSETS = "assets/"
+MAX_ASSET_BYTES = 32 * 1024 * 1024
+ASSET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,80}\.(png|jpg|jpeg|gif|bmp)", re.I)
 SECTIONS = ("construction", "views", "spreadsheet", "cas")
 
 Migration = Callable[[dict], dict]
@@ -61,7 +66,8 @@ def migrate(data: dict, target: int | None = None) -> dict:
     return data
 
 
-def write_pkgeo(path: str | os.PathLike, sections: dict[str, Any], thumbnail_png: bytes | None = None) -> Path:
+def write_pkgeo(path: str | os.PathLike, sections: dict[str, Any], thumbnail_png: bytes | None = None,
+                assets: dict[str, bytes] | None = None) -> Path:
     """Write a document atomically (temporary file, then rename)."""
     path = Path(path)
     payload = {
@@ -79,6 +85,9 @@ def write_pkgeo(path: str | os.PathLike, sections: dict[str, Any], thumbnail_png
             z.writestr(DOCUMENT, text)
             if thumbnail_png:
                 z.writestr(THUMBNAIL, thumbnail_png, compress_type=zipfile.ZIP_STORED)
+            for name, data in (assets or {}).items():
+                if ASSET_NAME.fullmatch(name):
+                    z.writestr(ASSETS + name, data, compress_type=zipfile.ZIP_STORED)
         os.replace(tmp, path)
     except OSError as exc:
         try:
@@ -121,3 +130,18 @@ def read_pkgeo(path: str | os.PathLike) -> tuple[dict, bytes | None]:
         if not isinstance(data.get(key), dict):
             data[key] = {}
     return data, thumb
+
+
+def read_pkgeo_assets(path: str | os.PathLike) -> dict[str, bytes]:
+    """Pictures stored in a document (names are checked; oversized entries are skipped)."""
+    out: dict[str, bytes] = {}
+    try:
+        with zipfile.ZipFile(Path(path)) as z:
+            for info in z.infolist():
+                name = info.filename[len(ASSETS):]
+                if info.filename.startswith(ASSETS) and ASSET_NAME.fullmatch(name) \
+                        and info.file_size <= MAX_ASSET_BYTES:
+                    out[name] = z.read(info)
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise FileFormatError(f"Could not read the pictures in {Path(path).name}: {exc}") from None
+    return out

@@ -10,13 +10,171 @@ against the type in brackets.
 
 ## Contents
 
-* **Geometry**: [Angle](#angle), [Area](#area), [Center](#center), [Circle](#circle), [Circumference](#circumference), [Distance](#distance), [Intersect](#intersect), [Line](#line), [Midpoint](#midpoint), [Perimeter](#perimeter), [PerpendicularBisector](#perpendicularbisector), [PerpendicularLine](#perpendicularline), [Polygon](#polygon), [Polyline](#polyline), [Ray](#ray), [Segment](#segment), [Slope](#slope), [Vector](#vector)
+* **Action Objects**: [Slider](#slider)
+* **Conics**: [CircularArc](#circulararc), [CircularSector](#circularsector), [CircumcircularArc](#circumcirculararc), [CircumcircularSector](#circumcircularsector), [Conic](#conic), [Diameter](#diameter), [Ellipse](#ellipse), [Hyperbola](#hyperbola), [Parabola](#parabola), [Polar](#polar), [Semicircle](#semicircle), [Tangent](#tangent)
+* **Geometry**: [Angle](#angle), [AngleBisector](#anglebisector), [Area](#area), [Center](#center), [Circle](#circle), [Circumference](#circumference), [Distance](#distance), [Intersect](#intersect), [Line](#line), [Locus](#locus), [Midpoint](#midpoint), [Perimeter](#perimeter), [PerpendicularBisector](#perpendicularbisector), [PerpendicularLine](#perpendicularline), [Point](#point), [Polygon](#polygon), [Polyline](#polyline), [Ray](#ray), [Relation](#relation), [Segment](#segment), [Slope](#slope), [Vector](#vector), [Vertex](#vertex)
 * **Lists**: [Append](#append), [CountIf](#countif), [Element](#element), [Filter](#filter), [First](#first), [Flatten](#flatten), [Iteration](#iteration), [IterationList](#iterationlist), [Join](#join), [KeepIf](#keepif), [Last](#last), [Length](#length), [Product](#product), [Reverse](#reverse), [Sequence](#sequence), [Sort](#sort), [Sum](#sum), [Take](#take), [Unique](#unique), [Zip](#zip)
 * **Logic**: [If](#if)
 * **Matrices**: [Determinant](#determinant), [Invert](#invert), [Transpose](#transpose)
 * **Numbers and algebra**: [Div](#div), [GCD](#gcd), [LCM](#lcm), [Max](#max), [Min](#min), [Mod](#mod), [Random](#random), [RandomBetween](#randombetween), [RandomUniform](#randomuniform)
+* **Scripting**: [CenterView](#centerview), [Delete](#delete), [SetAxesRatio](#setaxesratio), [SetColor](#setcolor), [SetCoords](#setcoords), [SetValue](#setvalue), [SetVisibleInView](#setvisibleinview), [StartAnimation](#startanimation), [UpdateConstruction](#updateconstruction), [ZoomIn](#zoomin), [ZoomOut](#zoomout)
+* **Special Objects**: [Image](#image)
+* **Statistics**: [FitLine](#fitline)
 * **Text**: [LaTeX](#latex), [Text](#text)
+* **Transformations**: [Dilate](#dilate), [Reflect](#reflect), [Rotate](#rotate), [Translate](#translate)
 * **Predefined functions**: [list](#predefined-functions)
+
+## Action Objects
+
+### Slider
+
+A number (or angle) you can drag in the Graphics view. Typed on its own line, e.g. a = Slider(0, 10, 0.5), it creates a slider object.
+
+* `Slider( <Min>, <Max> )`
+* `Slider( <Min>, <Max>, <Increment> )`
+
+Examples:
+
+* `a = Slider(0, 10)`
+* `k = Slider(-5, 5, 0.1)`
+* `α = Slider(0°, 360°, 1°)`
+
+## Conics
+
+### CircularArc
+
+Arc of the circle around a midpoint through A, counterclockwise to the ray towards B.
+
+* `CircularArc( <Midpoint>, <Point>, <Point> )`
+
+Examples:
+
+* `CircularArc((0, 0), (2, 0), (0, 5))`
+
+### CircularSector
+
+Sector of the circle around a midpoint, from A counterclockwise to the ray towards B.
+
+* `CircularSector( <Midpoint>, <Point>, <Point> )`
+
+Examples:
+
+* `CircularSector((0, 0), (2, 0), (0, 2))`
+
+### CircumcircularArc
+
+Arc through three points (from the first, through the second, to the third).
+
+* `CircumcircularArc( <Point>, <Point>, <Point> )`
+
+Examples:
+
+* `CircumcircularArc((1, 0), (0, 1), (-1, 0))`
+
+### CircumcircularSector
+
+Sector of the circle through three points.
+
+* `CircumcircularSector( <Point>, <Point>, <Point> )`
+
+Examples:
+
+* `CircumcircularSector((1, 0), (0, 1), (-1, 0))`
+
+### Conic
+
+Conic through five points, or from the coefficients of a x² + b xy + c y² + d x + e y + f = 0.
+
+* `Conic( <Point>, <Point>, <Point>, <Point>, <Point> )`
+* `Conic( <Number>, <Number>, <Number>, <Number>, <Number>, <Number> )`
+
+Examples:
+
+* `Conic(A, B, C, D, E)`
+* `Conic(1, 0, 4, 0, 0, -4)`
+
+### Diameter
+
+Diameter of a conic conjugate to a line or vector direction.
+
+* `Diameter( <Line>, <Conic> )`
+* `Diameter( <Vector>, <Conic> )`
+
+Examples:
+
+* `Diameter(y = x, x^2 / 4 + y^2 = 1)`
+
+### Ellipse
+
+Ellipse from its two foci and the semi-major axis length, or a point on it.
+
+* `Ellipse( <Focus>, <Focus>, <Semimajor Axis Length> )`
+* `Ellipse( <Focus>, <Focus>, <Point on Ellipse> )`
+
+Examples:
+
+* `Ellipse((-3, 0), (3, 0), 5)`
+* `Ellipse(F, G, P)`
+
+### Hyperbola
+
+Hyperbola from its two foci and the semi-major axis length, or a point on it.
+
+* `Hyperbola( <Focus>, <Focus>, <Semimajor Axis Length> )`
+* `Hyperbola( <Focus>, <Focus>, <Point on Hyperbola> )`
+
+Examples:
+
+* `Hyperbola((-5, 0), (5, 0), 3)`
+* `Hyperbola(F, G, P)`
+
+### Parabola
+
+Parabola with a focus and a directrix line.
+
+* `Parabola( <Focus>, <Directrix> )`
+
+Examples:
+
+* `Parabola((0, 1), y = -1)  ->  x² = 4y`
+
+### Polar
+
+Polar line of a point with respect to a conic.
+
+* `Polar( <Point>, <Conic> )`
+
+Examples:
+
+* `Polar((0, 2), x^2 + y^2 = 1)  ->  y = 0.5`
+
+### Semicircle
+
+Semicircle over the segment AB, on the left when walking from A to B.
+
+* `Semicircle( <Point>, <Point> )`
+
+Examples:
+
+* `Semicircle((-2, 0), (2, 0))`
+
+### Tangent
+
+Tangent lines from a point to a conic, to a function at a point or x-value, or parallel to a line.
+
+* `Tangent( <Point>, <Conic> )`
+* `Tangent( <Point>, <Conic>, <Index> )`
+* `Tangent( <x-Value>, <Function> )`
+* `Tangent( <Point>, <Function> )`
+* `Tangent( <Line>, <Circle> )`
+* `Tangent( <Line>, <Circle>, <Index> )`
+
+Examples:
+
+* `Tangent((0, 2), x^2 + y^2 = 1)`
+* `Tangent(1, f)`
+* `Tangent(A, f)`
+* `Tangent(y = 0, c)`
 
 ## Geometry
 
@@ -27,6 +185,8 @@ Angle measured counterclockwise: Angle(A, B, C) at apex B from BA to BC; between
 * `Angle( <Point>, <Apex>, <Point> )`
 * `Angle( <Vector>, <Vector> )`
 * `Angle( <Line>, <Line> )`
+* `Angle( <Polygon> )`
+* `Angle( <Polygon>, <Index> )`
 * `Angle( <Vector> )`
 * `Angle( <Number> )`
 
@@ -34,6 +194,19 @@ Examples:
 
 * `Angle((1, 0), (0, 0), (0, 1))  ->  90°`
 * `Angle(Vector((1, 0)), Vector((1, 1)))  ->  45°`
+
+### AngleBisector
+
+Bisector of the angle ABC, or the two bisectors of two lines.
+
+* `AngleBisector( <Point>, <Vertex>, <Point> )`
+* `AngleBisector( <Line>, <Line> )`
+* `AngleBisector( <Line>, <Line>, <Index> )`
+
+Examples:
+
+* `AngleBisector((1, 0), (0, 0), (0, 1))  ->  -x + y = 0`
+* `AngleBisector(g, h)`
 
 ### Area
 
@@ -123,6 +296,16 @@ Examples:
 * `Line(A, g)`
 * `Line(A, Vector((1, 2)))`
 
+### Locus
+
+Path traced by a point while another point moves along its object.
+
+* `Locus( <Locus Point>, <Point on Object> )`
+
+Examples:
+
+* `Locus(M, P)`
+
 ### Midpoint
 
 Midpoint of two points or a segment; center of a circle or conic.
@@ -168,12 +351,25 @@ Examples:
 
 * `PerpendicularLine((1, 1), y = 2x)`
 
+### Point
+
+A point on an object (line, segment, ray, circle, conic, arc, polygon, function graph). It stays on the object and can be dragged along it.
+
+* `Point( <Path> )`
+* `Point( <Path>, <Parameter> )`
+
+Examples:
+
+* `Point(c)`
+* `Point(f, 2)`
+
 ### Polygon
 
 Polygon through the given vertices (or a list of points).
 
 * `Polygon( <Point>, <Point>, <Point>, ... )`
 * `Polygon( <List of Points> )`
+* `Polygon( <Point>, <Point>, <Number of Vertices> )`
 
 Examples:
 
@@ -202,11 +398,23 @@ Examples:
 
 * `Ray((0, 0), (1, 1))`
 
+### Relation
+
+Describes how two objects relate: equal, incident, parallel, perpendicular, tangent, ...
+
+* `Relation( <Object>, <Object> )`
+
+Examples:
+
+* `Relation(A, g)`
+* `Relation(g, h)`
+
 ### Segment
 
 Segment between two points.
 
 * `Segment( <Point>, <Point> )`
+* `Segment( <Point>, <Length> )`
 
 Examples:
 
@@ -233,6 +441,21 @@ Examples:
 
 * `Vector((1, 1), (4, 5))  ->  (3, 4)`
 * `Vector((2, 3))`
+
+### Vertex
+
+Vertices of a polygon or a conic (all, or the n-th).
+
+* `Vertex( <Polygon> )`
+* `Vertex( <Polygon>, <Index> )`
+* `Vertex( <Conic> )`
+* `Vertex( <Conic>, <Index> )`
+
+Examples:
+
+* `Vertex(poly1, 2)`
+* `Vertex(poly1)`
+* `Vertex(ell)`
 
 ## Lists
 
@@ -622,6 +845,155 @@ Examples:
 
 * `RandomUniform(0, 1)`
 
+## Scripting
+
+### CenterView
+
+Move the Graphics view so that a point is in the centre.
+
+* `CenterView( <Center> )`
+
+Examples:
+
+* `CenterView((0, 0))`
+* `CenterView(A)`
+
+### Delete
+
+Delete an object and everything that depends on it.
+
+* `Delete( <Object> )`
+
+Examples:
+
+* `Delete(A)`
+
+### SetAxesRatio
+
+Set the ratio of the x and y axis scales (x units : y units on screen).
+
+* `SetAxesRatio( <x>, <y> )`
+
+Examples:
+
+* `SetAxesRatio(1, 1)`
+* `SetAxesRatio(1, 10)`
+
+### SetColor
+
+Change the colour of an object: a palette name or #RRGGBB, or red, green, blue between 0 and 1.
+
+* `SetColor( <Object>, <Color Name> )`
+* `SetColor( <Object>, <Red>, <Green>, <Blue> )`
+
+Examples:
+
+* `SetColor(A, "red")`
+* `SetColor(c, "magenta")`
+* `SetColor(A, 0, 0, 1)`
+
+### SetCoords
+
+Move a free point or vector to new coordinates.
+
+* `SetCoords( <Object>, <x>, <y> )`
+
+Examples:
+
+* `SetCoords(A, 1, 2)`
+
+### SetValue
+
+Set a free object to a value (or move a point on its object to a position).
+
+* `SetValue( <Object>, <Value> )`
+
+Examples:
+
+* `SetValue(a, 3)`
+* `SetValue(A, (1, 2))`
+
+### SetVisibleInView
+
+Show or hide an object in Graphics view 1 or 2.
+
+* `SetVisibleInView( <Object>, <View Number>, <Visible> )`
+
+Examples:
+
+* `SetVisibleInView(A, 1, false)`
+
+### StartAnimation
+
+Start or stop animation: all animated objects, or turn animation on for given sliders and points.
+
+* `StartAnimation( )`
+* `StartAnimation( <Run> )`
+* `StartAnimation( <Object>, <Object>, ... )`
+* `StartAnimation( <Object> )`
+
+Examples:
+
+* `StartAnimation()`
+* `StartAnimation(false)`
+* `StartAnimation(a, B)`
+
+### UpdateConstruction
+
+Recompute every object and draw new random numbers.
+
+* `UpdateConstruction( )`
+
+Examples:
+
+* `UpdateConstruction()`
+
+### ZoomIn
+
+Zoom the Graphics view in by a factor around its centre, or show a rectangle.
+
+* `ZoomIn( <Factor> )`
+* `ZoomIn( <Min x>, <Min y>, <Max x>, <Max y> )`
+
+Examples:
+
+* `ZoomIn(2)`
+* `ZoomIn(-5, -5, 5, 5)`
+
+### ZoomOut
+
+Zoom the Graphics view out by a factor around its centre.
+
+* `ZoomOut( <Factor> )`
+
+Examples:
+
+* `ZoomOut(2)`
+
+## Special Objects
+
+### Image
+
+A picture stored in the document (made by the Image tool, which adds the file). Its position and size are set in the Graphics view or in Properties.
+
+* `Image( <File Name> )`
+
+Examples:
+
+* `Image("photo.png")`
+
+## Statistics
+
+### FitLine
+
+Least-squares regression line y = m x + b through a list of points.
+
+* `FitLine( <List of Points> )`
+
+Examples:
+
+* `FitLine({(0, 1), (1, 3), (2, 5)})  ->  y = 2x + 1`
+
 ## Text
 
 ### LaTeX
@@ -647,6 +1019,59 @@ Examples:
 
 * `Text(1/3)  ->  "0.33"`
 * `"Area: " + Text(Area(p))`
+
+## Transformations
+
+### Dilate
+
+Scale an object by a factor from the origin or from a point.
+
+* `Dilate( <Object>, <Factor> )`
+* `Dilate( <Object>, <Factor>, <Center> )`
+
+Examples:
+
+* `Dilate((1, 2), 3)  ->  (3, 6)`
+* `Dilate(poly1, 2, A)`
+
+### Reflect
+
+Mirror an object about a point, a line, or a circle (inversion).
+
+* `Reflect( <Object>, <Point> )`
+* `Reflect( <Object>, <Line> )`
+* `Reflect( <Object>, <Circle> )`
+
+Examples:
+
+* `Reflect((1, 2), (0, 0))  ->  (-1, -2)`
+* `Reflect(A, x = 0)`
+* `Reflect(A, Circle((0, 0), 2))`
+
+### Rotate
+
+Rotate an object counterclockwise by an angle, around the origin or a point.
+
+* `Rotate( <Object>, <Angle> )`
+* `Rotate( <Object>, <Angle>, <Center> )`
+
+Examples:
+
+* `Rotate((2, 0), 90°)  ->  (0, 2)`
+* `Rotate(poly1, 30°, A)`
+
+### Translate
+
+Move an object by a vector, or place a vector at a start point.
+
+* `Translate( <Object>, <Vector> )`
+* `Translate( <Vector>, <Start Point> )`
+
+Examples:
+
+* `Translate((1, 1), Vector((2, 3)))  ->  (3, 4)`
+* `Translate(f, Vector((0, 1)))`
+* `Translate(u, A)`
 
 ## Predefined functions
 

@@ -116,6 +116,8 @@ class ArgSpec:
             return "lazy"
         if self.type == "Variable":
             return "var"
+        if self.type == "Label":
+            return "label"
         return "value"
 
     @staticmethod
@@ -123,7 +125,7 @@ class ArgSpec:
         t = text.strip().strip("<>")
         label, _, typ = t.partition(":")
         typ = typ or label
-        if typ not in ARG_TYPES and typ not in LAZY_TYPES and typ != "Variable":
+        if typ not in ARG_TYPES and typ not in LAZY_TYPES and typ not in ("Variable", "Label"):
             raise ValueError(f"unknown argument type {typ!r}")
         return ArgSpec(label, typ)
 
@@ -168,6 +170,7 @@ class Command:
     pointwise: ClassVar[bool] = False   # may take free-variable numbers: builds a residual
     random: ClassVar[bool] = False      # draws random numbers (kept in element state)
     multi_output: ClassVar[bool] = False
+    action: ClassVar[bool] = False      # changes the construction instead of defining an object
     signatures: ClassVar[tuple[Signature, ...]] = ()
 
     def syntaxes(self) -> list[str]:
@@ -205,6 +208,12 @@ class Command:
                     continue
                 if spec.kind == "var":
                     if not isinstance(node, Ident):
+                        ok = False
+                        break
+                    args.append(node.name)
+                    continue
+                if spec.kind == "label":  # the name of an existing object (a dependency)
+                    if not isinstance(node, Ident) or not call.ctx.has_label(node.name):
                         ok = False
                         break
                     args.append(node.name)

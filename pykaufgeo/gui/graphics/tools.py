@@ -10,7 +10,9 @@ from PySide6.QtGui import QMouseEvent, QPainter, QPainterPath
 
 from pykaufgeo import theme
 from pykaufgeo.core import values as V
+from pykaufgeo.core.dragging import DragSession, moved_point, point_xy
 from pykaufgeo.core.errors import PKGError
+from pykaufgeo.core.types import GeoType
 from pykaufgeo.gui.graphics.painter import paint_preview_path
 from pykaufgeo.gui.qt_theme import theme_manager
 from pykaufgeo.i18n import tr
@@ -22,25 +24,8 @@ if TYPE_CHECKING:
 DRAG_THRESHOLD = 3
 
 
-def draggable_xy(value: object) -> tuple[float, float] | None:
-    """World position used to drag a free object, or None if it cannot be dragged (yet)."""
-    if isinstance(value, V.Point):
-        return (value.x, value.y)
-    if isinstance(value, complex):
-        return (value.real, value.imag)
-    if isinstance(value, V.Vector):
-        s = value.start or V.Point(0.0, 0.0)
-        return (s.x + value.x, s.y + value.y)
-    return None
-
-
-def moved_value(value: object, x: float, y: float) -> object:
-    if isinstance(value, complex):
-        return complex(x, y)
-    if isinstance(value, V.Vector):
-        s = value.start or V.Point(0.0, 0.0)
-        return V.Vector(x - s.x, y - s.y, start=value.start)
-    return V.Point(x, y)
+draggable_xy = point_xy    # world position of a point-like value (used for arrow-key nudges)
+moved_value = moved_point
 
 
 class Tool:
@@ -68,7 +53,13 @@ class Tool:
 
 
 class MoveTool(Tool):
-    """Select objects, drag free points/vectors/labels, drag empty space to pan."""
+    """Select objects and drag them; drag empty space to pan.
+
+    Free points move to the mouse (snapping to the grid), points on objects slide
+    along them, dependent lines, polygons, conics, ... move their free points,
+    sliders change their value (or move, when dragged by the track), texts and
+    images move. Every drag is one undo step.
+    """
 
     tool_id = "move"
 
@@ -77,8 +68,10 @@ class MoveTool(Tool):
         self._reset()
 
     def _reset(self) -> None:
-        self.drag: str | None = None
+        self.session: DragSession | None = None
         self.offset = (0.0, 0.0)
+        self.slider: str | None = None
+        self.place: tuple[str, str, list[float], QPointF] | None = None  # label, extras key, start, mouse
         self.label: str | None = None
         self.label_start = QPointF()
         self.label_orig = (0, 0)
@@ -95,7 +88,7 @@ class MoveTool(Tool):
             self.label_orig = c.document.construction[lab].style.label_offset
             c.selection.set([lab])
             return
-        hits = c.hits(pos)
+        hits = [h for h in c.hits(pos) if not (c.drawable(h) and c.drawable(h).ghost)]
         if not hits:
             self.pan_from, self.pan_vp, self.moved = pos, c.vp, False
             return
@@ -104,23 +97,76 @@ class MoveTool(Tool):
             c.selection.toggle(top)
         elif top not in c.selection:
             c.selection.set([top])
-        el = c.document.construction[top]
-        xy = draggable_xy(el.value)
-        if el.free and xy is not None and not el.style.fixed:
-            wx, wy = c.world(pos)
-            self.drag, self.offset = top, (wx - xy[0], wy - xy[1])
+        con = c.document.construction
+        el = con[top]
+        d = c.drawable(top)
+        if d is not None and d.kind == "slider":
+            knob = d.points[0]
+            if el.style.fixed or math.hypot(knob.x() - pos.x(), knob.y() - pos.y()) <= max(d.radius, theme.MIN_HIT / 2):
+                if el.free:
+                    self.slider = top
+                    c.document.begin_action(tr("Change") + f" {top}")
+                    self._slide(pos)
+                return
+            left = d.path.elementAt(0)
+            self.place = (top, "screen", [left.x, left.y], pos)
             c.document.begin_action(tr("Move") + f" {top}")
+            return
+        if d is not None and d.kind in ("text", "image") and not el.style.fixed:
+            key = "screen" if "screen" in el.extras else ("corner" if d.kind == "image" else "pos")
+            start = list(el.extras.get(key) or ([d.rect.left(), d.rect.top()] if key == "screen" else c.world(pos)))
+            self.place = (top, key, [float(v) for v in start], pos)
+            c.document.begin_action(tr("Move") + f" {top}")
+            return
+        wx, wy = c.world(pos)
+        session = DragSession.start(con, top, (wx, wy))
+        if session is not None:
+            self.session = session
+            self.offset = (wx - session.anchor[0], wy - session.anchor[1])
+            c.document.begin_action(tr("Move") + f" {top}")
+
+    def _slide(self, pos: QPointF) -> None:
+        c = self.c
+        con = c.document.construction
+        el = con[self.slider]
+        d = c.drawable(self.slider)
+        s = el.extras.get("slider") or {}
+        if d is None or d.path is None:
+            return
+        left, right = d.path.elementAt(0), d.path.elementAt(1)
+        width = max(right.x - left.x, 1.0)
+        lo, hi = float(s.get("min", 0.0)), float(s.get("max", 1.0))
+        step = float(s.get("step") or 0.0)
+        v = lo + min(max((pos.x() - left.x) / width, 0.0), 1.0) * (hi - lo)
+        if step > 0:
+            v = lo + round((v - lo) / step) * step
+        v = round(min(max(v, lo), hi), 12)
+        try:
+            con.set_value(self.slider, V.Angle(v) if el.geo_type is GeoType.ANGLE else v)
+        except PKGError as exc:
+            c.message.emit("error", exc.message)
 
     def move(self, e: QMouseEvent) -> None:
         c, pos = self.c, e.position()
-        if self.drag is not None:
+        if self.session is not None:
             wx, wy = c.world(pos)
-            x, y = c.snap(wx - self.offset[0], wy - self.offset[1])
-            el = c.document.construction[self.drag]
+            ax, ay = wx - self.offset[0], wy - self.offset[1]
+            if self.session.mode in ("free", "parents", "offset"):
+                ax, ay = c.snap(ax, ay)
             try:
-                c.document.construction.set_value(self.drag, moved_value(el.value, x, y))
+                self.session.move_anchor(ax, ay)
             except PKGError as exc:
                 c.message.emit("error", exc.message)
+        elif self.slider is not None:
+            self._slide(pos)
+        elif self.place is not None:
+            label, key, start, mouse = self.place
+            if key == "screen":
+                new = [round(start[0] + pos.x() - mouse.x()), round(start[1] + pos.y() - mouse.y())]
+            else:
+                (x0, y0), (x1, y1) = c.world(mouse), c.world(pos)
+                new = [start[0] + x1 - x0, start[1] + y1 - y0]
+            c.document.construction.set_extras(label, **{key: new})
         elif self.label is not None:
             dx, dy = pos.x() - self.label_start.x(), pos.y() - self.label_start.y()
             c.label_drag = {self.label: (int(self.label_orig[0] + dx), int(self.label_orig[1] + dy))}
@@ -134,7 +180,7 @@ class MoveTool(Tool):
 
     def release(self, e: QMouseEvent) -> None:
         c = self.c
-        if self.drag is not None:
+        if self.session is not None or self.slider is not None or self.place is not None:
             c.document.end_action()
         elif self.label is not None:
             offset = c.label_drag.get(self.label)
@@ -149,7 +195,7 @@ class MoveTool(Tool):
         self._reset()
 
     def cancel(self) -> None:
-        if self.drag is not None:
+        if self.session is not None or self.slider is not None or self.place is not None:
             self.c.document.end_action()
         self.c.label_drag = {}
         self._reset()
@@ -340,4 +386,6 @@ def make_tool(canvas: "GraphicsCanvas", tool_id: str) -> Tool | None:
         return TwoPointTool(canvas, tool_id, "Circle")
     if tool_id == "delete":
         return DeleteTool(canvas)
-    return None
+    from pykaufgeo.gui.graphics.tools_build import make_build_tool
+
+    return make_build_tool(canvas, tool_id)

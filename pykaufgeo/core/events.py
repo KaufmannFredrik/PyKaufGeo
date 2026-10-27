@@ -71,6 +71,21 @@ class ViewSettingsChanged(Event):
 
 
 @dataclass(frozen=True)
+class ViewCommand(Event):
+    """A view action from a command (ZoomIn, SetAxesRatio, CenterView, ...)."""
+
+    name: str
+    args: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class AnimationCommand(Event):
+    """Start (True) or stop (False) the animation of objects marked as animating."""
+
+    running: bool
+
+
+@dataclass(frozen=True)
 class DocumentChanged(Event):
     modified: bool
     path: str | None

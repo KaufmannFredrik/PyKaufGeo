@@ -346,6 +346,53 @@ class InequalityValue:
     variables: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ArcValue:
+    """Circular arc (or sector) from angle ``start`` sweeping ``sweep`` radians counterclockwise."""
+
+    center: Point
+    r: float
+    start: float
+    sweep: float
+    sector: bool = False
+
+    def is_defined(self) -> bool:
+        return self.center.is_defined() and _finite(self.r, self.start, self.sweep) and self.r >= 0
+
+    @property
+    def length(self) -> float:
+        return abs(self.sweep) * self.r
+
+    @property
+    def area(self) -> float:
+        return abs(self.sweep) * self.r * self.r / 2
+
+    def point_at(self, t: float) -> Point:
+        """t in [0, 1] from the start to the end of the arc."""
+        a = self.start + t * self.sweep
+        return Point(self.center.x + self.r * math.cos(a), self.center.y + self.r * math.sin(a))
+
+
+@dataclass(frozen=True)
+class LocusValue:
+    """Traced positions of a point, as one or more polylines."""
+
+    pieces: tuple[tuple[Point, ...], ...]
+
+    def is_defined(self) -> bool:
+        return any(len(p) >= 2 for p in self.pieces)
+
+
+@dataclass(frozen=True, slots=True)
+class ImageValue:
+    """An image stored in the document's assets under ``asset``."""
+
+    asset: str
+
+    def is_defined(self) -> bool:
+        return bool(self.asset)
+
+
 @dataclass(frozen=True)
 class MultiOutput:
     """Result of a command with several outputs (e.g. Intersect of a line and circle)."""
@@ -378,7 +425,7 @@ TYPE_OF: dict[type, GeoType] = {
     Ray: GeoType.RAY, Circle: GeoType.CIRCLE, Conic: GeoType.CONIC,
     Polygon: GeoType.POLYGON, Polyline: GeoType.POLYLINE, CurveValue: GeoType.CURVE,
     ImplicitValue: GeoType.IMPLICIT, InequalityValue: GeoType.INEQUALITY,
-    str: GeoType.TEXT, complex: GeoType.COMPLEX,
+    str: GeoType.TEXT, complex: GeoType.COMPLEX, LocusValue: GeoType.LOCUS, ImageValue: GeoType.IMAGE,
 }
 
 
@@ -395,6 +442,8 @@ def geo_type_of(v: Any) -> GeoType:
         return GeoType.MATRIX if v.is_matrix else GeoType.LIST
     if isinstance(v, FunctionValue):
         return GeoType.FUNCTION if len(v.params) == 1 else GeoType.FUNCTION_NVAR
+    if isinstance(v, ArcValue):
+        return GeoType.SECTOR if v.sector else GeoType.ARC
     return TYPE_OF.get(type(v), GeoType.UNKNOWN)
 
 

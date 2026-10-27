@@ -27,6 +27,8 @@ class GeoElement:
     state: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     scripts: dict[str, str] = field(default_factory=dict)  # "on_click" / "on_update" (M8)
+    # View data that is not a style: slider range and position, text position, image size.
+    extras: dict[str, Any] = field(default_factory=dict)
 
     @property
     def definition(self) -> str:

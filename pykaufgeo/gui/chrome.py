@@ -255,6 +255,11 @@ class BrutalDialog(_ShadowMasked, QDialog):
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
+        # Fusion ignores QSS padding in spin boxes; inset their text like other fields.
+        for box in self.findChildren(QAbstractSpinBox):
+            edit = box.findChild(QLineEdit)
+            if edit is not None:
+                edit.setTextMargins(theme.PADDING_WIDE, 0, 0, 0)
         parent = self.parentWidget()
         if parent is not None:
             geo = self.frameGeometry()

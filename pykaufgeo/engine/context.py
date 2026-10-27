@@ -24,6 +24,8 @@ class EvalContext:
         self.decimals = decimals
         self.root: Node | None = None
         self._random_index = 0
+        self.construction = None  # set by Construction; used by Locus and action commands
+        self.allow_actions = False  # True only when an action command runs on its own
 
     def begin(self, root: "Node") -> None:
         self.root = root

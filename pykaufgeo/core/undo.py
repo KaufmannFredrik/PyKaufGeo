@@ -113,6 +113,13 @@ class UndoManager:
         self._depth -= 1
         return self.checkpoint(description) if self._depth == 0 else False
 
+    def abort(self) -> None:
+        """Close an open step without recording it, restoring the state before it began."""
+        if self._depth == 0:
+            return
+        self._depth = 0
+        self._rollback_if_changed()
+
     @contextmanager
     def transaction(self, description: str) -> Iterator[None]:
         """Group everything inside into one undo step."""

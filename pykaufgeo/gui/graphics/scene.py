@@ -11,22 +11,22 @@ import math
 import struct
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
-from PySide6.QtCore import QByteArray, QDataStream, QIODevice, QPointF, QRectF
-from PySide6.QtGui import QColor, QPainterPath, QPainterPathStroker, QPolygonF
+from PySide6.QtCore import QByteArray, QDataStream, QIODevice, QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QPainterPath, QPainterPathStroker, QPixmap, QPolygonF
 
 from pykaufgeo import theme
 from pykaufgeo.core import values as V
 from pykaufgeo.core.construction import Construction
 from pykaufgeo.core.element import GeoElement
-from pykaufgeo.core.types import GeoType
+from pykaufgeo.core.types import GRAPHICAL_2D, GeoType
 from pykaufgeo.render.clip import line_on_screen, ray_on_screen, segment_on_screen
 from pykaufgeo.render.sampling import sample_function
 from pykaufgeo.render.viewport import Viewport
 
-KIND_ORDER = {"fill": 0, "curve": 1, "vector": 2, "point": 3}
+KIND_ORDER = {"image": -1, "fill": 0, "curve": 1, "vector": 2, "text": 3, "slider": 4, "point": 5}
 SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 OFFSCREEN_MARGIN = 60.0
 
@@ -51,10 +51,22 @@ class Drawable:
     label_color: QColor | None = None
     label_offset: tuple[int, int] = (0, 0)
     casing: QColor | None = None    # ink outline for colours that are hard to see on the canvas
+    rect: QRectF | None = None      # texts and images
+    text_lines: list[str] | None = None
+    font: QFont | None = None
+    pixmap: QPixmap | None = None
+    ghost: bool = False             # hidden object shown faintly by the Show / Hide Object tool
     _hit: QPainterPath | None = None
 
     def hit_distance(self, x: float, y: float) -> float | None:
         """Pixel distance to the object if within pick tolerance, else None."""
+        if self.kind in ("text", "image"):
+            pad = theme.TEXT_PAD
+            return 1.0 if self.rect is not None and self.rect.adjusted(-pad, -pad, pad, pad).contains(x, y) else None
+        if self.kind == "slider":
+            knob = min((math.hypot(p.x() - x, p.y() - y) for p in self.points), default=math.inf)
+            if knob <= max(self.radius, theme.MIN_HIT / 2):
+                return 0.0
         if self.kind == "point":
             reach = max(self.radius + theme.POINT_OUTLINE, theme.MIN_HIT / 2)
             best = min((math.hypot(p.x() - x, p.y() - y) for p in self.points), default=math.inf)
@@ -68,7 +80,7 @@ class Drawable:
         pt = QPointF(x, y)
         if self._hit.contains(pt):
             return 1.0
-        if self.kind == "vector" and self.head is not None and self.head.containsPoint(pt, 0):
+        if self.kind == "vector" and self.head is not None and self.head.containsPoint(pt, Qt.FillRule.OddEvenFill):
             return 1.0
         if self.kind == "fill" and self.path.contains(pt):
             return float(theme.HIT_TOLERANCE)
@@ -122,6 +134,21 @@ def display_label(label: str) -> str:
     return f"{base}_{sub}{primes}"
 
 
+@dataclass
+class SceneContext:
+    """What drawables need besides the object: fonts, pictures, other objects' values."""
+
+    font: QFont = field(default_factory=QFont)
+    assets: dict[str, bytes] = field(default_factory=dict)
+    lookup: Callable[[str], Any] = lambda _label: None
+    show_hidden: bool = False
+    slider_index: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def key(self) -> tuple:
+        return (self.font.pointSizeF(), self.font.family(), self.show_hidden, len(self.assets))
+
+
 class Scene:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[tuple, Drawable | None]] = {}
@@ -135,20 +162,30 @@ class Scene:
                 self._cache.pop(lab, None)
 
     def build(self, construction: Construction, vp: Viewport, view_key: str, colors: theme.ThemeColors,
-              square_points: bool, decimals: int) -> list[Drawable]:
+              square_points: bool, decimals: int, ctx: SceneContext | None = None) -> list[Drawable]:
+        ctx = ctx or SceneContext()
+        ctx.lookup = construction.value_or_none
         out: list[Drawable] = []
         alive = set()
         self.rebuilt = set()
+        sliders = 0
         for el in construction:
-            if view_key not in el.style.visible_in:
+            shown = view_key in el.style.visible_in
+            if el.extras.get("slider") is not None and "screen" not in el.extras and shown:
+                ctx.slider_index[el.label] = sliders
+                sliders += 1
+            if not shown and not (ctx.show_hidden and el.geo_type in GRAPHICAL_2D and _placeable(el)):
                 continue
             alive.add(el.label)
-            key = (id(el.value), id(el.style), el.caption, vp.key, colors.name, square_points, decimals)
+            key = (id(el.value), id(el.style), id(el.extras), el.caption, vp.key, colors.name, square_points, decimals,
+                   ctx.key, shown, ctx.slider_index.get(el.label))
             hit = self._cache.get(el.label)
             if hit is not None and hit[0] == key:
                 d = hit[1]
             else:
-                d = make_drawable(el, vp, colors, square_points, decimals) if el.is_defined else None
+                d = make_drawable(el, vp, colors, square_points, decimals, ctx) if el.is_defined else None
+                if d is not None and not shown:
+                    d.ghost = True
                 self._cache[el.label] = (key, d)
                 self.rebuilt.add(el.label)
             if d is not None:
@@ -157,6 +194,11 @@ class Scene:
             del self._cache[stale]
         out.sort(key=lambda d: (d.layer, KIND_ORDER[d.kind]))
         return out
+
+
+def _placeable(el: GeoElement) -> bool:
+    """Texts and images typed in the input bar have no place in the view until a tool gives them one."""
+    return el.geo_type not in (GeoType.TEXT, GeoType.IMAGE) or bool(el.extras)
 
 
 def hit_test(drawables: list[Drawable], x: float, y: float) -> list[str]:
@@ -220,8 +262,13 @@ def _on_screen(x: float, y: float, vp: Viewport, margin: float = OFFSCREEN_MARGI
 
 
 def make_drawable(el: GeoElement, vp: Viewport, colors: theme.ThemeColors, square_points: bool,
-                  decimals: int) -> Drawable | None:
+                  decimals: int, ctx: SceneContext | None = None) -> Drawable | None:
+    from pykaufgeo.gui.graphics import shapes
+
     v: Any = el.value
+    if el.extras:
+        if el.extras.get("slider") is not None or el.extras.get("triangle"):
+            return shapes.make_extra(el, vp, colors, decimals, ctx or SceneContext())
     if isinstance(v, (V.Point, complex)):
         x, y = (v.x, v.y) if isinstance(v, V.Point) else (v.real, v.imag)
         return _point(el, [(x, y)], vp, colors, square_points, decimals)
@@ -241,7 +288,8 @@ def make_drawable(el: GeoElement, vp: Viewport, colors: theme.ThemeColors, squar
         return _polygon(el, v, vp, colors, decimals)
     if isinstance(v, V.FunctionValue) and len(v.params) == 1:
         return _function(el, v, vp, colors, decimals)
-    return None  # conics (M3), curves, implicit curves and regions (M4), angles and text (M3)
+    # conics, arcs, angles, loci, texts, images; curves, implicit curves and regions arrive in M4
+    return shapes.make_extra(el, vp, colors, decimals, ctx or SceneContext())
 
 
 def _point(el: GeoElement, pts: list[tuple[float, float]], vp: Viewport, colors: theme.ThemeColors,
@@ -378,8 +426,18 @@ def world_bounds(construction: Construction, view_key: str) -> tuple[float, floa
         elif isinstance(v, V.Vector):
             s = v.start or V.Point(0, 0)
             pts = [(s.x, s.y), (s.x + v.x, s.y + v.y)]
-        elif isinstance(v, V.Circle):
+        elif isinstance(v, (V.Circle, V.ArcValue)):
             pts = [(v.center.x - v.r, v.center.y - v.r), (v.center.x + v.r, v.center.y + v.r)]
+        elif isinstance(v, V.Conic):
+            from pykaufgeo.core import conics
+
+            sh = conics.shape_of(v.coefficients())
+            if sh.kind == "ellipse":
+                pts = [(sh.cx - sh.a, sh.cy - sh.a), (sh.cx + sh.a, sh.cy + sh.a)]
+            elif sh.kind in ("hyperbola", "parabola"):
+                pts = [conics.point_at(sh, 0.0)]
+        elif isinstance(v, V.LocusValue):
+            pts = [(q.x, q.y) for piece in v.pieces for q in piece[:: max(1, len(piece) // 20)]]
         elif isinstance(v, (V.Polygon, V.Polyline)):
             pts = [(p.x, p.y) for p in v.vertices]
         elif isinstance(v, V.Line) and v.anchor is not None:

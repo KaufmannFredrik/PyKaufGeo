@@ -135,7 +135,7 @@ build.py               PyInstaller one-file build
 | M0 | Skeleton, packaging, tests, theme tokens, brutalist shell with empty panels | done |
 | M1 | Core model, DAG, parser, evaluator, command registry (core subset), undo/redo, save/load | done |
 | M2 | 2D graphics view, input bar, algebra view | done |
-| M3 | Full tool set, transformations, conics, polygons, locus, sliders, animation, styling, properties | not started |
+| M3 | Full tool set, transformations, conics, polygons, locus, sliders, animation, styling, properties | done |
 | M4 | Calculus/analysis commands, implicit and parametric curves, inequalities | not started |
 | M5 | CAS view | not started |
 | M6 | Spreadsheet, statistics, regression, probability calculator | not started |
@@ -212,3 +212,39 @@ build.py               PyInstaller one-file build
   the full style bar are M3.
 * Next: M3 (full tool set, transformations, conics, polygons, locus, sliders,
   animation, styling, properties dialog).
+
+### M3: tools, transformations, conics, sliders, properties (2026-10-28)
+
+* Model: conic geometry (canonical frame, parameterisation, sampling, conic/conic
+  intersection), points on objects with a stored parameter (`core/paths.py`), Locus,
+  arcs and sectors, transformations (rotate, reflect in point/line/circle, translate,
+  dilate) for every geometric type, Relation, conic commands (Ellipse, Hyperbola,
+  Parabola, Conic, Vertex, Tangent, Polar, Diameter, AngleBisector, FitLine), regular
+  polygons, polygon angles, Image. Equations print with whole-number coefficients
+  where possible (`16x² + 25y² = 400`).
+* Action commands (SetValue, SetColor, SetCoords, SetVisibleInView, Delete,
+  StartAnimation, UpdateConstruction, ZoomIn/Out, SetAxesRatio, CenterView) run when
+  typed on their own; `a = Slider(min, max, step)` makes a slider. Objects carry
+  `extras` (slider range, positions, image size), saved in files and undo.
+* Dragging (`core/dragging.py`): points along their objects, dependent objects by
+  their free points, free equations and functions, constant shapes, vector-polygon
+  vertices; sliders, texts and images in the view.
+* Graphics: conics, arcs, sectors, angles (square for right angles), loci, texts,
+  images, sliders, slope triangles; trace layer; hidden objects ghosted by the
+  Show / Hide tool.
+* All 56 M3 tools (`tools_build.py` pattern tools, `tools_extra.py` vertex, rectangle,
+  position, click and stroke tools); clicks attach new points to objects and
+  intersections; Escape removes a half-finished action (`Document.abort_action`).
+* Properties dialog (Ctrl+E, object menu, style bar), icon style bar, object
+  right-click menu, animation with play/pause.
+* Design review fixes: style bar text truncated at 20 pt (now icons), the canvas
+  jumping when the style bar appeared (now always shown), Properties tabs cut off
+  (no scroll buttons; the dialog widens), object names upper-cased in the dialog
+  title, spin-box text touching the border (an M0 bug: Fusion ignores QSS padding
+  there), horizontal tangents printed as `0.45y = 2.34`, sliders without an Algebra
+  visibility box, a vector hit-test crash.
+* Test suite: 456 tests in about 35 s (`test_m3_model`, `test_m3_tools`, `test_m3_ui`).
+* Not done: rigid polygons do not rotate; freehand function graphs; scripting tab
+  (M8); LaTeX texts in the Graphics view (M8).
+* Next: M4 (calculus and analysis commands, implicit and parametric curves,
+  inequality regions, function tools).

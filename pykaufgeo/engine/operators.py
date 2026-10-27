@@ -18,6 +18,7 @@ from pykaufgeo.core.errors import EvalError
 from pykaufgeo.core.format import format_value
 from pykaufgeo.core.values import (
     Angle,
+    ArcValue,
     Circle,
     FunctionValue,
     Line,
@@ -51,6 +52,10 @@ def as_number(v: Any) -> Any:
         return v.length if v.is_defined() else math.nan
     if isinstance(v, Polygon):
         return v.area if v.is_defined() else math.nan
+    if isinstance(v, ArcValue):
+        if not v.is_defined():
+            return math.nan
+        return v.area if v.sector else v.length
     return v
 
 

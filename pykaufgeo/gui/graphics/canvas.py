@@ -12,11 +12,11 @@ from pykaufgeo import theme
 from pykaufgeo.core import values as V
 from pykaufgeo.core.document import Document
 from pykaufgeo.core.errors import PKGError
-from pykaufgeo.core.events import ConstructionReset, Event, ViewSettingsChanged
+from pykaufgeo.core.events import AnimationCommand, ConstructionReset, Event, ViewCommand, ViewSettingsChanged
 from pykaufgeo.gui.chrome import BrutalMenu
 from pykaufgeo.gui.graphics.painter import GRID_MODES, paint_axes, paint_drawables, paint_grid, \
     paint_highlights, paint_labels, paint_zoom_rect
-from pykaufgeo.gui.graphics.scene import Drawable, Scene, hit_test, world_bounds
+from pykaufgeo.gui.graphics.scene import Drawable, Scene, SceneContext, hit_test, world_bounds
 from pykaufgeo.gui.graphics.tools import MoveTool, Tool, draggable_xy, make_tool, moved_value
 from pykaufgeo.gui.qt_theme import theme_manager
 from pykaufgeo.gui.selection import Selection
@@ -35,6 +35,7 @@ GRID_SHORT = {"none": "No grid", "major": "Major", "cartesian": "Major+minor", "
 
 class GraphicsCanvas(QWidget):
     message = Signal(str, str)  # kind, text
+    properties_requested = Signal(list)  # labels
 
     def __init__(self, document: Document, selection: Selection, view_id: str, view_key: str,
                  parent: QWidget | None = None) -> None:
@@ -57,6 +58,8 @@ class GraphicsCanvas(QWidget):
         self._layer_key: tuple | None = None
         self._layer_labels: dict[str, QRectF] = {}
         self._layer_occupied: Occupied | None = None
+        self._trace: QPixmap | None = None
+        self._trace_key: tuple | None = None
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
@@ -114,6 +117,10 @@ class GraphicsCanvas(QWidget):
             self._reload_viewport()
 
     def _on_event(self, event: Event) -> None:
+        if isinstance(event, ViewCommand):
+            if self.view_key == "g1":
+                self.run_view_command(event.name, event.args)
+            return
         if isinstance(event, ViewSettingsChanged):
             if event.view_id in (None, self.view_id) and not self._own_change:
                 self._reload_viewport()
@@ -122,12 +129,29 @@ class GraphicsCanvas(QWidget):
             self.scene.invalidate()
         self.update()
 
+    def run_view_command(self, name: str, args: tuple[float, ...]) -> None:
+        """ZoomIn, ZoomOut, SetAxesRatio and CenterView typed in the input bar."""
+        vp = self.vp
+        if name == "zoom":
+            self.set_viewport(vp.zoomed(vp.width / 2, vp.height / 2, args[0]))
+        elif name == "rect":
+            self.set_viewport(vp.zoomed_to(*args, keep_ratio=False))
+        elif name == "ratio":
+            # x units : y units on screen means yscale / xscale = x / y
+            x, y = args
+            self.set_viewport(vp.zoomed(vp.sx(0), vp.sy(0), 1.0, (vp.xscale * x / y) / vp.yscale))
+        elif name == "center":
+            self.set_viewport(vp.panned(vp.width / 2 - vp.sx(args[0]), vp.height / 2 - vp.sy(args[1])))
+
     # ------------------------------------------------------------------ geometry helpers
     def world(self, pos: QPointF) -> tuple[float, float]:
         return (self.vp.wx(pos.x()), self.vp.wy(pos.y()))
 
     def hits(self, pos: QPointF) -> list[str]:
-        return hit_test(self.drawables, pos.x(), pos.y())
+        """Objects under the cursor that may be selected (Properties > Advanced > Selection Allowed)."""
+        c = self.document.construction
+        return [lab for lab in hit_test(self.drawables, pos.x(), pos.y())
+                if lab in c and c[lab].style.selection_allowed]
 
     def label_at(self, pos: QPointF) -> str | None:
         for label, rect in self.label_rects.items():
@@ -152,16 +176,36 @@ class GraphicsCanvas(QWidget):
         dy = max(0, math.ceil(math.log10(max(vp.yscale, 1e-12))))
         return (round(x, dx), round(y, dy))
 
-    def pick_or_create_point(self, pos: QPointF) -> str:
-        """An existing point under the cursor, or a new free point there (snapped)."""
+    def drawable(self, label: str) -> Drawable | None:
+        for d in self.drawables:
+            if d.label == label:
+                return d
+        return None
+
+    def pick_or_create_point(self, pos: QPointF, attach: bool = True) -> str:
+        """An existing point under the cursor, or a new point there.
+
+        With ``attach``, clicking where two objects cross makes their intersection point,
+        and clicking on a line, circle, conic, ... makes a point on it; otherwise the new
+        point is free (snapped to the grid).
+        """
+        from pykaufgeo.gui.graphics import placing
+
         c = self.document.construction
-        for label in self.hits(pos):
-            if isinstance(c[label].value, V.Point):
+        hits = self.hits(pos)
+        for label in hits:
+            if isinstance(c[label].value, V.Point) and self.drawable(label) is not None \
+                    and self.drawable(label).kind == "point":
                 return label
+        if attach:
+            made = placing.attach_point(self, pos, hits)
+            if made is not None:
+                self.style_new([made])
+                return made
         x, y = self.snap(*self.world(pos))
-        made = c.execute(f"({format_float_input(x)}, {format_float_input(y)})")
-        self.style_new(made)
-        return made[0]
+        made_list = c.execute(f"({format_float_input(x)}, {format_float_input(y)})")
+        self.style_new(made_list)
+        return made_list[0]
 
     def style_new(self, labels: list[str]) -> None:
         """Objects created in Graphics 2 are shown there instead of in Graphics."""
@@ -202,8 +246,9 @@ class GraphicsCanvas(QWidget):
         return tool is not None
 
     # ------------------------------------------------------------------ painting
-    def _paint_base(self, p: QPainter, drawables: list[Drawable]) -> tuple[dict[str, QRectF], Occupied]:
-        """Background, grid, axes, objects and their labels."""
+    def _paint_base(self, p: QPainter, drawables: list[Drawable],
+                    trace: QPixmap | None = None) -> tuple[dict[str, QRectF], Occupied]:
+        """Background, grid, axes, traces, objects and their labels."""
         mgr = theme_manager()
         colors, vp, settings = mgr.colors, self.vp, self.settings
         p.fillRect(QRectF(0, 0, vp.width, vp.height), QColor(colors.canvas_bg))
@@ -211,6 +256,8 @@ class GraphicsCanvas(QWidget):
         paint_grid(p, vp, grid if grid in GRID_MODES else "cartesian", colors)
         if settings.get("axes", True):
             paint_axes(p, vp, colors, mgr.mono_font(0.9), mgr.ui_font(1.1, heavy=True))
+        if trace is not None:
+            p.drawPixmap(0, 0, trace)
         paint_drawables(p, drawables, set(), None, colors)
         occupied = Occupied()
         rects = paint_labels(p, drawables, mgr.ui_font(1.0, heavy=True), colors, vp, self.label_drag, occupied)
@@ -227,13 +274,16 @@ class GraphicsCanvas(QWidget):
         mgr = theme_manager()
         colors, vp = mgr.colors, self.vp
         c = self.document.construction
-        self.drawables = self.scene.build(c, vp, self.view_key, colors, mgr.prefs.square_points, c.decimals)
+        ctx = SceneContext(font=mgr.ui_font(1.0), assets=self.document.assets,
+                           show_hidden=bool(getattr(self.tool, "show_hidden", False)))
+        self.drawables = self.scene.build(c, vp, self.view_key, colors, mgr.prefs.square_points, c.decimals, ctx)
+        self._update_trace(colors)
         live = self.scene.rebuilt | set(self.label_drag)
         static = [d for d in self.drawables if d.label not in live]
         dynamic = [d for d in self.drawables if d.label in live]
         p = QPainter(self)
         if not static:  # pan, zoom or first frame: everything was rebuilt
-            self.label_rects, _ = self._paint_base(p, self.drawables)
+            self.label_rects, _ = self._paint_base(p, self.drawables, self._trace)
             self._layer_key = None
         else:
             dpr = self.devicePixelRatioF()
@@ -248,6 +298,8 @@ class GraphicsCanvas(QWidget):
                 lp.end()
                 self._layer, self._layer_key = layer, key
             p.drawPixmap(0, 0, self._layer)
+            if self._trace is not None:
+                p.drawPixmap(0, 0, self._trace)
             paint_drawables(p, dynamic, set(), None, colors)
             occupied = Occupied()
             for r in self._layer_labels.values():
@@ -259,6 +311,30 @@ class GraphicsCanvas(QWidget):
         if self._zoom_from is not None and self._zoom_to is not None:
             paint_zoom_rect(p, QRectF(self._zoom_from, self._zoom_to).normalized(), colors)
         p.end()
+
+    def _update_trace(self, colors: theme.ThemeColors) -> None:
+        """Objects with Trace on leave their drawing behind (until the view moves or is cleared)."""
+        c, vp = self.document.construction, self.vp
+        dpr = self.devicePixelRatioF()
+        key = (vp.key, colors.name, dpr)
+        if key != self._trace_key:
+            self._trace, self._trace_key = None, key
+        traced = [d for d in self.drawables
+                  if d.label in self.scene.rebuilt and d.label in c and c[d.label].style.trace and not d.ghost]
+        if not traced:
+            return
+        if self._trace is None:
+            self._trace = QPixmap(int(vp.width * dpr), int(vp.height * dpr))
+            self._trace.setDevicePixelRatio(dpr)
+            self._trace.fill(Qt.GlobalColor.transparent)
+        tp = QPainter(self._trace)
+        paint_drawables(tp, traced, set(), None, colors)
+        tp.end()
+
+    def clear_traces(self) -> None:
+        self._trace = None
+        self._layer_key = None
+        self.update()
 
     # ------------------------------------------------------------------ mouse
     def mousePressEvent(self, e: QMouseEvent) -> None:  # noqa: N802
@@ -295,7 +371,13 @@ class GraphicsCanvas(QWidget):
                 locked = bool(self.settings.get("axis_ratio_locked"))
                 self.set_viewport(self.vp.zoomed_to(x0, y0, x1, y1, keep_ratio=locked))
             else:
-                self.context_menu(b)
+                hits = self.hits(b)
+                if hits:
+                    if hits[0] not in self.selection:
+                        self.selection.set([hits[0]])
+                    self.object_menu(hits[0]).exec(self.mapToGlobal(b.toPoint()))
+                else:
+                    self.context_menu(b)
             self.update()
             return
         if e.button() == Qt.MouseButton.LeftButton:
@@ -378,6 +460,55 @@ class GraphicsCanvas(QWidget):
         menu.addSeparator()
         menu.addAction(tr("Standard View"), self.standard_view)
         menu.addAction(tr("Show All Objects"), self.show_all)
+        menu.addAction(tr("Clear Traces"), self.clear_traces)
+        return menu
+
+    def object_menu(self, label: str) -> BrutalMenu:
+        """Right-click menu of an object: visibility, label, trace, animation, fix, rename, delete."""
+        from pykaufgeo.core.locus import is_path_point
+        from pykaufgeo.gui import dialogs
+
+        doc = self.document
+        el = doc.construction[label]
+        menu = BrutalMenu(f"{tr(el.geo_type.display_name)} {label}", self)
+        head = menu.addAction(f"{tr(el.geo_type.display_name)} {label}")
+        head.setEnabled(False)
+        menu.addSeparator()
+
+        def toggle(text: str, on: bool, apply) -> None:
+            act = menu.addAction(tr(text))
+            act.setCheckable(True)
+            act.setChecked(on)
+            act.triggered.connect(apply)
+
+        def set_shown(on: bool) -> None:
+            views = set(el.style.visible_in)
+            doc.set_style(label, visible_in=sorted(views | {self.view_key} if on else views - {self.view_key}))
+
+        toggle("Show Object", self.view_key in el.style.visible_in, set_shown)
+        toggle("Show Label", el.style.label_visible, lambda on: doc.set_style(label, label_visible=on))
+        toggle("Trace On", el.style.trace, lambda on: doc.set_style(label, trace=on))
+        if el.extras.get("slider") is not None or is_path_point(doc.construction, label):
+            def animate(on: bool) -> None:
+                doc.set_style(label, animating=on)
+                if on:
+                    doc.bus.emit(AnimationCommand(True))
+
+            toggle("Animation On", el.style.animating, animate)
+        toggle("Fix Object", el.style.fixed, lambda on: doc.set_style(label, fixed=on))
+        menu.addSeparator()
+
+        def rename() -> None:
+            new = dialogs.ask_text(self, tr("Rename"), tr("New name for") + f" {label}:", label)
+            if new and new.strip() != label:
+                try:
+                    doc.rename(label, new.strip())
+                except PKGError as exc:
+                    self.message.emit("error", exc.message)
+
+        menu.addAction(tr("Rename…"), rename)
+        menu.addAction(tr("Delete"), lambda: doc.delete(label))
+        menu.addAction(tr("Properties…"), lambda: self.properties_requested.emit(list(self.selection.labels) or [label]))
         return menu
 
 

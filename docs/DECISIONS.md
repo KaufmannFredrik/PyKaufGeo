@@ -235,3 +235,70 @@ functions, object names). Accepting one inserts `Circle(<Center>, <Radius>)` wit
 the first placeholder selected; Tab selects the next. Submitting text that still
 contains a `<placeholder>` is an error naming it. The hint bar shows every overload
 that fits the current argument count with the current argument inverted.
+
+## M3
+
+**D-301 Points on objects store a parameter.** `Point(c)` keeps `state["param"]`
+(angle on a circle, 0..1 on a segment, x on a graph, ...; `core/paths.py`). The point
+follows its object when the object moves and dragging projects the mouse onto it.
+The parameter is saved, so files reopen with points where they were.
+
+**D-302 Locus by re-evaluation.** `Locus(Q, M)` moves M over its object's parameter
+range (240 samples, refined to at most 1200 where neighbours are far apart),
+re-evaluating only the chain from M to Q with overrides, and splits the path where
+it jumps. No symbolic elimination.
+
+**D-303 Action commands.** Commands that change things (`SetValue`, `ZoomIn`, ...) are
+marked `action` and run only when typed on their own; inside a definition they are
+an error. Model changes are undo steps; view changes travel as `ViewCommand` events
+to Graphics 1 and are not undo steps (as zooming is not).
+
+**D-304 Extras.** View data that is not style (slider range and position, text and
+image positions, image width, slope-triangle line) lives in `GeoElement.extras`,
+saved with the object and restored by undo. Sliders are free numbers whose
+`extras["slider"]` holds min, max and increment; `a = Slider(0, 10, 1)` creates one.
+
+**D-305 Dragging dependent objects.** A dependent line, polygon, conic, ... moves by
+translating all of its free ancestor points (GeoGebra's behaviour); a fixed ancestor
+point blocks the drag. Dependent points (midpoints, intersections) cannot be dragged.
+Free equations are rewritten (`y = 2x + 1` becomes `y = 2x - 1`), functions are
+re-expanded so repeated drags do not nest, and shapes built from constant points
+have those points shifted, but only if a trial shift really translates the shape.
+
+**D-306 Transformation names.** Tool results are named with primes (`A'`, `A''`,
+`poly1'`); functions get an ordinary new name because `f'` means the derivative.
+
+**D-307 Tool patterns.** Most tools are declared as patterns of object kinds
+(`"point line"`, ordered or not) plus a builder that types the command. Clicking
+empty space where a point is accepted makes a point, on an object or at an
+intersection if one is under the cursor. A cancelled tool action (Escape, another
+tool, a cancelled prompt) is rolled back completely by `Document.abort_action()`.
+
+**D-308 Pen and freehand.** A pen stroke becomes a polyline of constant points
+(simplified to 1.5 px). Freehand Shape recognises a circle (least squares, RMS
+error under 7 % of the radius), a straight segment and polygons of 3 to 8 corners;
+anything else is reported as not recognised. Freehand function graphs: M4.
+
+**D-309 Style bar.** A second bar under the view bar with icon buttons (colour, line,
+point, label, properties) acting on the selection. It is always shown and only
+disabled without a selection, so the canvas never changes size when the selection
+changes; icons keep it inside narrow panels at 24 pt.
+
+**D-310 Animation.** One timer (the 60 fps token) advances every object with
+Animation on; one pass over a slider range or a path takes 10 s at speed 1. Modes:
+oscillating, increasing, decreasing (wrapping), once. Frames are not undo steps; the
+view bar shows PLAY / PAUSE while some object is animated.
+
+**D-311 Traces.** Objects with Trace on paint into a transparent layer each time they
+change. The layer is cleared when the view pans or zooms, the theme changes, or by
+Clear Traces in the canvas menu (GeoGebra also drops traces on view changes).
+
+**D-312 Images in the document.** Pictures are stored inside the .pkgeo zip under
+`assets/` with sanitised unique names (PNG, JPEG, GIF, BMP; 32 MB each). Only
+pictures used by an Image object are saved. `Image("name.png")` is the object's
+definition; position and width are extras.
+
+**D-313 Whole-number equations.** Lines and conics without a typed equation print
+with the smallest whole-number coefficients when a multiplier up to 1000 exists
+(`16x² + 25y² = 400`); nearly horizontal or vertical lines (slope below 1e-7)
+print as `y = k` / `x = k`. Otherwise coefficients are shown rounded.

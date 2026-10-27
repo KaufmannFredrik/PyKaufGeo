@@ -26,6 +26,7 @@ SEQUENCES: dict[GeoType, list[str]] = {
     GeoType.SEGMENT: _FUNCS, GeoType.FUNCTION: _FUNCS, GeoType.FUNCTION_NVAR: _FUNCS,
     GeoType.POLYLINE: _FUNCS, GeoType.CURVE: _FUNCS, GeoType.CIRCLE: _CONICS,
     GeoType.CONIC: _CONICS, GeoType.IMPLICIT: _CONICS, GeoType.INEQUALITY: _FUNCS,
+    GeoType.ARC: _CONICS, GeoType.SECTOR: _CONICS,
     GeoType.NUMBER: _LOWER, GeoType.BOOLEAN: _LOWER, GeoType.ANGLE: _ANGLES,
 }
 PREFIXED: dict[GeoType, str] = {

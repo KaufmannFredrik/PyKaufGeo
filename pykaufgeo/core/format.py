@@ -113,13 +113,28 @@ def format_value(value: Any, decimals: int = 2) -> str:  # noqa: C901 - dispatch
         return format_number(value.length, decimals) if value.is_defined() else "?"
     if isinstance(value, V.Polygon):
         return format_number(value.area, decimals) if value.is_defined() else "?"
+    if isinstance(value, V.ArcValue):
+        if not value.is_defined():
+            return "?"
+        return format_number(value.area if value.sector else value.length, decimals)
+    if isinstance(value, V.LocusValue):
+        return "Locus" if value.is_defined() else "?"
+    if isinstance(value, V.ImageValue):
+        return value.asset
     if isinstance(value, (V.Line, V.Ray)):
         line = value if isinstance(value, V.Line) else value.line()
         if not line.is_defined():
             return "?"
         if line.source is not None:
             return f"{to_display(line.source[0], decimals)} = {to_display(line.source[1], decimals)}"
-        return format_linear([(line.a, "x"), (line.b, "y")], -line.c, decimals)
+        a, b, c = line.a, line.b, line.c
+        # horizontal / vertical lines read y = k / x = k (a slope below 1e-7 cannot show at any precision)
+        if abs(a) <= 1e-7 * abs(b):
+            a, b, c = 0.0, 1.0, c / b
+        elif abs(b) <= 1e-7 * abs(a):
+            a, b, c = 1.0, 0.0, c / a
+        a, b, c = integer_form((a, b, c))
+        return format_linear([(a, "x"), (b, "y")], -c, decimals)
     if isinstance(value, V.Circle):
         if not value.is_defined():
             return "?"
@@ -146,5 +161,32 @@ def format_value(value: Any, decimals: int = 2) -> str:  # noqa: C901 - dispatch
 
 
 def format_conic(c, decimals: int = 2) -> str:
-    terms = [(c.A, "x²"), (c.B, "x y"), (c.C, "y²"), (c.D, "x"), (c.E, "y")]
-    return format_linear(terms, -c.F, decimals)
+    k = integer_form((c.A, c.B, c.C, c.D, c.E, c.F))
+    if next((v for v in k if v != 0), 0) < 0:
+        k = tuple(-v for v in k)
+    terms = [(k[0], "x²"), (k[1], "x y"), (k[2], "y²"), (k[3], "x"), (k[4], "y")]
+    return format_linear(terms, -k[5], decimals)
+
+
+def integer_form(coeffs: tuple[float, ...], max_mult: int = 1000) -> tuple[float, ...]:
+    """Equation coefficients scaled to small whole numbers when that is possible.
+
+    ``0.04, 0.0625, -1`` becomes ``16, 25, -400``; coefficients that are already whole,
+    or have no small whole-number multiple, are returned unchanged.
+    """
+    if not all(math.isfinite(k) for k in coeffs):
+        return coeffs
+    big = max((abs(k) for k in coeffs), default=0.0)
+    if big == 0 or all(abs(k - round(k)) < 1e-9 * max(1.0, abs(k)) for k in coeffs):
+        return coeffs
+    base = min(abs(k) for k in coeffs if abs(k) > 1e-12 * big)
+    for m in range(1, max_mult + 1):
+        f = m / base
+        scaled = [k * f for k in coeffs]
+        if all(abs(v - round(v)) < 1e-7 * max(1.0, abs(v)) for v in scaled):
+            ints = [int(round(v)) for v in scaled]
+            if max(abs(v) for v in ints) > 10 ** 6:
+                break
+            g = math.gcd(*ints) or 1
+            return tuple(float(v // g) for v in ints)
+    return coeffs

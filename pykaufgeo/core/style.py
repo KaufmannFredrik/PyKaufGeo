@@ -23,7 +23,7 @@ KIND_FOR_TYPE: dict[GeoType, str] = {
     GeoType.CONIC: "conic", GeoType.IMPLICIT: "implicit", GeoType.POLYGON: "polygon",
     GeoType.ANGLE: "angle", GeoType.LOCUS: "locus", GeoType.INEQUALITY: "inequality",
     GeoType.TEXT: "text", GeoType.NUMBER: "number", GeoType.BOOLEAN: "boolean",
-    GeoType.LIST: "list", GeoType.COMPLEX: "complex",
+    GeoType.LIST: "list", GeoType.COMPLEX: "complex", GeoType.ARC: "conic", GeoType.SECTOR: "polygon",
 }
 
 
@@ -61,8 +61,11 @@ class Style:
         s.label_visible = kind in (GeoType.POINT, GeoType.POINT3D, GeoType.COMPLEX)
         if kind is GeoType.ANGLE:
             s.opacity = theme.ANGLE_FILL_OPACITY
-        if kind not in GRAPHICAL_2D or kind is GeoType.ANGLE:
-            s.visible_in = frozenset()
+        if kind not in GRAPHICAL_2D or kind in (GeoType.TEXT, GeoType.IMAGE):
+            s.visible_in = frozenset()  # texts and images become visible when placed by a tool
+        if kind is GeoType.ANGLE:
+            s.label_visible = True
+            s.label_mode = "name_value"
         if kind in (GeoType.POINT3D, GeoType.VECTOR3D):
             s.visible_in = frozenset({"g3d"})
         return s

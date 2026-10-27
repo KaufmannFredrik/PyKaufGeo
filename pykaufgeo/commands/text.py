@@ -1,12 +1,14 @@
-"""Text commands. FormulaText and LaTeX arrive with LaTeX rendering in M2."""
+"""Text commands, and Image (a picture stored in the document)."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from pykaufgeo.commands.registry import Command, register, sig
+from pykaufgeo.core.errors import CommandError
 from pykaufgeo.core.format import format_value
 from pykaufgeo.core.types import GeoType
+from pykaufgeo.core.values import ImageValue
 
 
 @register
@@ -34,3 +36,17 @@ class LaTeX(Command):
 
         v = call.eval(node)
         return value_latex(call.finalize(v) if isinstance(v, Sym) else v, call.decimals)
+
+
+@register
+class Image(Command):
+    category = "Special Objects"
+    description = ("A picture stored in the document (made by the Image tool, which adds the file). "
+                   "Its position and size are set in the Graphics view or in Properties.")
+    examples = ('Image("photo.png")',)
+
+    @sig("<File Name:Text>", returns=GeoType.IMAGE)
+    def named(self, call, name: str) -> ImageValue:
+        if not name.strip():
+            raise CommandError("Image needs the name of a picture in the document.")
+        return ImageValue(name.strip())

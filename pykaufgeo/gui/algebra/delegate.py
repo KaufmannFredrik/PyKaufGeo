@@ -25,8 +25,10 @@ if TYPE_CHECKING:
     from pykaufgeo.gui.algebra.view import AlgebraView
 
 
-def shows_in_graphics(geo_type: GeoType) -> bool:
-    return geo_type in GRAPHICAL_2D or geo_type is GeoType.LIST
+def shows_in_graphics(el) -> bool:
+    """Objects with a visibility toggle: drawable types, lists, sliders and slope triangles."""
+    return (el.geo_type in GRAPHICAL_2D or el.geo_type is GeoType.LIST
+            or el.extras.get("slider") is not None or bool(el.extras.get("triangle")))
 
 
 class AlgebraDelegate(QStyledItemDelegate):
@@ -92,12 +94,12 @@ class AlgebraDelegate(QStyledItemDelegate):
         p.fillRect(QRect(r.left(), r.bottom() - theme.BORDER_DENSE + 1, r.width(), theme.BORDER_DENSE), QColor(c.border))
         x = r.left() + theme.PADDING
         box = self.box_rect(r)
-        if shows_in_graphics(el.geo_type):
+        if shows_in_graphics(el):
             visible = bool(el.style.visible_in & {"g1", "g2"})
             self._toggle(p, box, visible, QColor(fg), QColor(bg))
         x = box.right() + theme.SPACING + 1
         swatch = QRect(x, box.top(), theme.ALGEBRA_BOX, theme.ALGEBRA_BOX)
-        if shows_in_graphics(el.geo_type):
+        if shows_in_graphics(el):
             color = QColor(theme.resolve_color(el.style.color, c))
             p.fillRect(swatch, QColor(fg))
             inner = swatch.adjusted(theme.BORDER_DENSE, theme.BORDER_DENSE, -theme.BORDER_DENSE, -theme.BORDER_DENSE)
