@@ -1,0 +1,25 @@
+[project]
+name = "pykaufgeo"
+version = "0.1.0"
+description = "Dynamic geometry, graphing, CAS, 3D, spreadsheet and probability in one linked construction."
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.6",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "sympy>=1.12",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pyinstaller>=6"]
+
+[project.gui-scripts]
+pykaufgeo = "pykaufgeo.gui.app:run"
+
+[tool.setuptools.packages.find]
+include = ["pykaufgeo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
