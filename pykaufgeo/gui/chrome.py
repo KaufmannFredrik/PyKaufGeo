@@ -278,6 +278,10 @@ class MessageBlock(QLabel):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        # The stylesheet sets border and padding only at the first polish; re-polishing after a
+        # property change updates colours but not the contents margins. Every kind has the same
+        # box model, so giving the block a kind from the start makes its padding take effect.
+        self.setProperty("kind", "info")
         self.setWordWrap(True)
         self.setTextFormat(Qt.TextFormat.PlainText)  # syntax hints contain <Point> etc.
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -290,6 +294,16 @@ class MessageBlock(QLabel):
         self.style().unpolish(self)
         self.style().polish(self)
         self.show()
+        self._fit_height()
+
+    def _fit_height(self) -> None:
+        """A wrapped label in a row layout keeps one line's height; claim what the text needs."""
+        if self.text() and self.width() > 0:
+            self.setMinimumHeight(self.heightForWidth(self.width()))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._fit_height()
 
     def clear_message(self) -> None:
         self.clear()

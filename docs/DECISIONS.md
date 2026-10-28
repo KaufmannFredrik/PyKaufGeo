@@ -302,3 +302,13 @@ definition; position and width are extras.
 with the smallest whole-number coefficients when a multiplier up to 1000 exists
 (`16x² + 25y² = 400`); nearly horizontal or vertical lines (slope below 1e-7)
 print as `y = k` / `x = k`. Otherwise coefficients are shown rounded.
+
+**D-314 Milestone demos and gallery.** Each finished milestone from M1 on has a demo in
+`pykaufgeo/demos.py`: input-bar lines plus a little setup, opened unsaved with a fresh
+undo history by `--demo` or Help > Milestone Demos, with a hint in the message block of
+what to try. `tools/gallery.py` renders every demo and writes docs/GALLERY.md (newest
+milestone first, review screenshots folded under each). `tests/test_demos.py` keeps both
+honest: a milestone marked done in PLAN.md needs a demo, and the gallery must be current.
+Writing the demos showed that message blocks ignored their padding (the stylesheet
+applies the box model only at the first polish), clipping the first letter and long
+texts; message blocks now get their kind before the first polish and grow to fit.

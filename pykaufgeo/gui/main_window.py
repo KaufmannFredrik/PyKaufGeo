@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pathlib import Path
 
-from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt
+from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QFrame,
@@ -22,6 +22,7 @@ from pykaufgeo import theme
 from pykaufgeo.core.document import Document
 from pykaufgeo.core.errors import PKGError
 from pykaufgeo.core.events import DocumentChanged, UndoStateChanged
+from pykaufgeo.demos import DEMOS, load_demo
 from pykaufgeo.gui.algebra.view import AlgebraView
 from pykaufgeo.gui.animation import Animator
 from pykaufgeo.gui.autocomplete import first_placeholder
@@ -78,6 +79,7 @@ class MainWindow(QMainWindow):
     def __init__(self, document: Document | None = None) -> None:
         super().__init__()
         self.document = document or Document()
+        self._demo: str | None = None  # title of the open milestone demo (until saved or replaced)
         self.selection = Selection(self.document, self)
         self.panels: dict[str, Panel] = {}
         self.view_actions: dict[str, QAction] = {}
@@ -278,6 +280,9 @@ class MainWindow(QMainWindow):
 
         m_help = brutal_menu_bar_menu(bar, tr("&Help"))
         m_help.addAction(self._action(tr("Command Help"), self.show_command_help, "F1"))
+        m_demos = m_help.addMenu(tr("Milestone Demos"))
+        for key, demo in DEMOS.items():
+            m_demos.addAction(self._action(tr(demo.title), lambda _=False, k=key: self.open_demo(k)))
         m_help.addAction(self._action(tr("About PyKaufGeo"), self.show_about))
 
         self._action(tr("Focus input bar"), self.focus_input, "Ctrl+I")
@@ -466,8 +471,38 @@ class MainWindow(QMainWindow):
         self.act_undo.setText(tr("Undo") + (f": {u.undo_text}" if u.undo_text else ""))
         self.act_redo.setText(tr("Redo") + (f": {u.redo_text}" if u.redo_text else ""))
 
+    def open_demo(self, key: str) -> bool:
+        """Replace the construction with a milestone demo (asks to save changes first)."""
+        if not self.maybe_save():
+            return False
+        try:
+            demo = load_demo(self.document, key)
+        except KeyError:
+            self.message.show_message("error", tr("No demo called") + f" {key}; " + tr("choose one of")
+                                      + " " + ", ".join(DEMOS))
+            return False
+        for view in demo.views:
+            self.set_view_visible(view, True)
+        self._demo = demo.title
+        self._update_title()
+        QTimer.singleShot(0, self._frame_demo)
+        self.message.show_message("info", tr(demo.hint))
+        return True
+
+    def _frame_demo(self) -> None:
+        """Show every object once the panels have their final size (not an undo step)."""
+        for canvas in self.canvases:
+            if canvas.isVisible():
+                canvas.show_all()
+
     def _update_title(self) -> None:
-        name = self.document.path.name if self.document.path else tr("Untitled")
+        demo = self._demo
+        if self.document.path:
+            name = self.document.path.name
+        elif demo:
+            name = tr("Demo") + " " + demo
+        else:
+            name = tr("Untitled")
         mark = " *" if self.document.modified else ""
         self.setWindowTitle(f"{name}{mark} - PyKaufGeo")
 
@@ -495,6 +530,7 @@ class MainWindow(QMainWindow):
 
     def file_new(self) -> None:
         if self.maybe_save():
+            self._demo = None
             self.document.new()
             self.message.clear_message()
 
@@ -511,6 +547,8 @@ class MainWindow(QMainWindow):
         except PKGError as exc:
             self.message.show_message("error", exc.message)
             return False
+        self._demo = None
+        self._update_title()
         if errors:
             self.message.show_message("warning", tr("Some objects could not be restored") + ": " + "; ".join(errors))
         else:

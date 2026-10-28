@@ -10,6 +10,18 @@ objects, intersections, polygons, conics, arcs, angles, transformations, locus,
 sliders with animation, texts, images, pen, a style bar and the Properties dialog).
 See `PLAN.md` for the roadmap and `FEATURES.md` for the honest feature checklist.
 
+## See it
+
+[docs/GALLERY.md](docs/GALLERY.md) shows every finished milestone with screenshots. To try
+one yourself, open its demo: a ready-made construction that says what to try.
+
+```
+python -m pykaufgeo --demo          # demo of the newest milestone
+python -m pykaufgeo --demo m2       # demo of a given milestone (m1, m2, m3, ...)
+```
+
+In the app: Help > Milestone Demos. Demos open unsaved, so nothing is overwritten.
+
 ## Run
 
 ```
@@ -35,6 +47,7 @@ Sum(k^2, k, 1, 10)
 ```
 python -m pytest                    # full suite (GUI tests run headless)
 python tools/screenshot.py          # design-review screenshots into docs/screenshots
+python tools/gallery.py             # demo screenshots + docs/GALLERY.md
 python tools/gen_commands_md.py     # regenerate docs/COMMANDS.md
 python build.py                     # one-file executable in dist/
 ```

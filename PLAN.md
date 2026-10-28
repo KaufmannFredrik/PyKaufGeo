@@ -78,9 +78,9 @@ pykaufgeo/
     main_window.py     menus, toolbar, panel grid, input bar, status
     chrome.py          hard-shadow menu / dialog / tooltip, focus ring overlay
     panel.py toolbar.py tools_catalog.py icons.py messages.py preferences.py ...
-tools/                 screenshot.py, gen_commands_md.py
+tools/                 screenshot.py, gallery.py, gen_commands_md.py
 tests/                 pytest suite (headless, QT_QPA_PLATFORM=offscreen)
-docs/                  ARCHITECTURE.md DESIGN.md DECISIONS.md COMMANDS.md screenshots/
+docs/                  ARCHITECTURE.md DESIGN.md DECISIONS.md COMMANDS.md GALLERY.md screenshots/
 build.py               PyInstaller one-file build
 ```
 
@@ -146,6 +146,11 @@ build.py               PyInstaller one-file build
 ## 7. Milestone notes
 
 (Appended at the end of each milestone.)
+
+Finishing a milestone: tests green; review screenshots (`tools/screenshot.py`) and fix
+what they show; add a demo for it to `pykaufgeo/demos.py`; run `tools/gallery.py`;
+update FEATURES.md, this file and docs/; commit and push. `tests/test_demos.py` fails if
+a milestone is marked done without a demo or if docs/GALLERY.md is stale.
 
 ### M0: skeleton, packaging, tests, tokens, shell (2026-10-27)
 

@@ -64,13 +64,26 @@ def create_app(argv: list[str] | None = None, prefs: Preferences | None = None) 
     return app
 
 
-def parse_args(argv: list[str]) -> tuple[list[str], int | None, str | None]:
-    """Files to open, ``--quit-after=MS`` and ``--smoke-report=FILE`` (smoke tests, build check)."""
+def parse_args(argv: list[str]) -> tuple[list[str], int | None, str | None, str | None]:
+    """Files to open, ``--demo[=m2]``, ``--quit-after=MS`` and ``--smoke-report=FILE``.
+
+    ``--demo`` alone opens the latest milestone demo; ``--demo m2`` and ``--demo=m2`` a given one.
+    """
+    from pykaufgeo.demos import DEMOS, LATEST
+
     files: list[str] = []
     quit_after: int | None = None
     report: str | None = None
-    for arg in argv[1:]:
-        if arg.startswith("--smoke-report="):
+    demo: str | None = None
+    args = argv[1:]
+    for i, arg in enumerate(args):
+        if arg == "--demo":
+            demo = LATEST
+        elif arg.startswith("--demo="):
+            demo = arg.split("=", 1)[1].lower()
+        elif i and args[i - 1] == "--demo" and arg.lower() in DEMOS:
+            demo = arg.lower()
+        elif arg.startswith("--smoke-report="):
             report = arg.split("=", 1)[1]
         elif arg.startswith("--quit-after="):
             try:
@@ -79,13 +92,13 @@ def parse_args(argv: list[str]) -> tuple[list[str], int | None, str | None]:
                 pass
         elif not arg.startswith("-"):
             files.append(arg)
-    return files, quit_after, report
+    return files, quit_after, report, demo
 
 
 def run(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     argv = list(argv if argv is not None else sys.argv)
-    files, quit_after, report = parse_args(argv)
+    files, quit_after, report, demo = parse_args(argv)
     app = create_app(argv[:1])
     from PySide6.QtCore import QTimer
 
@@ -95,6 +108,8 @@ def run(argv: list[str] | None = None) -> int:
     win.show()
     if files:
         win.file_open(files[0])
+    elif demo is not None:
+        win.open_demo(demo)
     if quit_after is not None:
         def finish() -> None:
             from pykaufgeo.gui.mathtext import math_renderer

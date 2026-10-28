@@ -438,6 +438,10 @@ def world_bounds(construction: Construction, view_key: str) -> tuple[float, floa
                 pts = [conics.point_at(sh, 0.0)]
         elif isinstance(v, V.LocusValue):
             pts = [(q.x, q.y) for piece in v.pieces for q in piece[:: max(1, len(piece) // 20)]]
+        elif isinstance(v, (str, V.ImageValue)):  # placed texts and images (their anchor corner)
+            anchor = el.extras.get("pos") or el.extras.get("corner")
+            if isinstance(anchor, (list, tuple)) and len(anchor) == 2:
+                pts = [(float(anchor[0]), float(anchor[1]))]
         elif isinstance(v, (V.Polygon, V.Polyline)):
             pts = [(p.x, p.y) for p in v.vertices]
         elif isinstance(v, V.Line) and v.anchor is not None:

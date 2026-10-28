@@ -11,6 +11,7 @@ Test names refer to files in `tests/`.
 - [x] `.pkgeo` format: zip with JSON construction, view settings, styles, spreadsheet, CAS rows, PNG thumbnail (M1): test_pkgeo::test_round_trip_preserves_everything, test_file_layout_and_version. The spreadsheet and CAS sections are stored and round-tripped; their views arrive in M5/M6.
 - [x] `.pkgeo` format version and migration hook (M1): test_pkgeo::test_migration_hook, test_newer_and_unmigratable_versions
 - [x] `build.py` builds one-file `PyKaufGeo` executable with PyInstaller and prints the path (M0; polish in M9): rebuilt after M3 as `dist/PyKaufGeo.exe` (95.7 MB) on Windows 11; `--quit-after --smoke-report` run of the exe opened an 11-object M3 file (ellipse, point on it, locus, slider, rotated polygon, text, stored picture) and typeset a formula with mathtext (exit code 0)
+- [x] Milestone demos and gallery: `python -m pykaufgeo --demo [mN]` and Help > Milestone Demos open a ready-made construction per finished milestone; `tools/gallery.py` writes docs/GALLERY.md with their screenshots (test_demos)
 - [~] Build notes for Linux and macOS (M9): written in the build.py docstring; not tried on those systems
 - [ ] Export graphics: PNG (M8)
 - [ ] Export graphics: SVG (M8)
