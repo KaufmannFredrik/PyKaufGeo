@@ -296,7 +296,7 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 
 - [~] No crash on any input; friendly errors in red block: parser and evaluator fuzz tests (test_parser::test_fuzz_*, test_evaluator::test_fuzz_*), damaged files (test_pkgeo), GUI input catches every exception (m1_input_error.png); re-checked as each view lands
 - [x] Undefined shown as `?` and propagated (M1): test_construction::test_undefined_propagates_and_recovers, test_evaluator::test_typed_undefined_keeps_object_type
-- [x] Pan/zoom smooth with 200 objects and functions sampled at up to 5000 points: test_graphics_view::test_repaint_performance_with_200_objects (202 objects + 2 functions: pan ~15-21 ms, repaint ~0.4 ms, drag ~1 ms, D-205)
+- [x] Pan/zoom smooth with 200 objects and functions sampled at up to 5000 points: test_graphics_view::test_repaint_performance_with_200_objects (202 objects + 2 functions: pan ~15-21 ms on an idle machine and under 4x a reference workload timed in the test, repaint ~0.4 ms, drag ~1 ms, D-205, D-506)
 - [x] Recompute after drag under 16 ms for typical constructions (M1): test_performance::test_drag_recompute_under_16ms (180 objects, 175 dependents: about 5 ms median)
 - [x] Tests: parser incl. odd inputs (M1): test_parser
 - [x] Tests: dependency order (M1): test_construction

@@ -176,6 +176,7 @@ class Scene:
     def build(self, construction: Construction, vp: Viewport, view_key: str, colors: theme.ThemeColors,
               square_points: bool, decimals: int, ctx: SceneContext | None = None) -> list[Drawable]:
         ctx = ctx or SceneContext()
+        ctx_key = ctx.key   # once per frame, not per object
         ctx.lookup = construction.value_or_none
         out: list[Drawable] = []
         alive = set()
@@ -190,7 +191,7 @@ class Scene:
                 continue
             alive.add(el.label)
             key = (id(el.value), id(el.style), id(el.extras), el.caption, vp.key, colors.name, square_points, decimals,
-                   ctx.key, shown, ctx.slider_index.get(el.label))
+                   ctx_key, shown, ctx.slider_index.get(el.label))
             hit = self._cache.get(el.label)
             if hit is not None and hit[0] == key:
                 d = hit[1]
@@ -275,10 +276,6 @@ def _on_screen(x: float, y: float, vp: Viewport, margin: float = OFFSCREEN_MARGI
 
 def make_drawable(el: GeoElement, vp: Viewport, colors: theme.ThemeColors, square_points: bool,
                   decimals: int, ctx: SceneContext | None = None) -> Drawable | None:
-    from pykaufgeo.gui.graphics import shapes
-
-    from pykaufgeo.gui.graphics import shapes_analysis as sa
-
     v: Any = el.value
     if el.extras:
         if el.extras.get("slider") is not None or el.extras.get("triangle"):
@@ -483,3 +480,8 @@ def world_bounds(construction: Construction, view_key: str) -> tuple[float, floa
     if not xs:
         return None
     return (min(xs), min(ys), max(xs), max(ys))
+
+
+# Shape builders for the other value types; imported last because they use this module.
+from pykaufgeo.gui.graphics import shapes  # noqa: E402
+from pykaufgeo.gui.graphics import shapes_analysis as sa  # noqa: E402

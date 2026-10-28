@@ -386,3 +386,11 @@ otherwise those between -100 and 100, or Newton from a start value).
 
 **D-505 Limits.** Every CAS row runs with a 10 s limit (D-401); integer powers with more
 than 100000 binary digits are refused before they are computed.
+
+**D-506 Timing tests.** The pan check in test_repaint_performance_with_200_objects measured
+45-51 ms instead of ~20 ms while the machine was busy (file syncing), with the M2 code
+giving the same numbers, so wall-clock limits failed for reasons outside the code. The
+test now takes the fastest of 20 pan frames and compares it with a fixed reference
+workload (Python arithmetic plus 400 QPainter lines) timed in the same test: pan must be
+under 4x the reference (2.5x measured) and under 150 ms. The static repaint and drag
+limits stay absolute because they have large margins.

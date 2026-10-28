@@ -7,7 +7,7 @@ import time
 
 import pytest
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QApplication
 
 from gui_helpers import RIGHT, click, close, drag, key, make_window, move, press, release, repaint, screen_of, wheel
@@ -312,19 +312,41 @@ def test_repaint_performance_with_200_objects(qapp, light_theme) -> None:
     c = win.graphics.canvas
     img = QImage(c.size(), QImage.Format.Format_ARGB32_Premultiplied)
 
-    def frames(step, n=20) -> float:
+    def frames(step, n=20, fastest: bool = False) -> float:
         ts = []
         for i in range(n):
             t0 = time.perf_counter()
             step(i)
             c.render(img)
             ts.append(time.perf_counter() - t0)
-        return sorted(ts)[n // 2]
+        return min(ts) if fastest else sorted(ts)[n // 2]
 
-    pan = frames(lambda i: c.set_viewport(c.vp.panned(5, 2), persist=False))
+    def reference() -> float:
+        """Fixed work mixing Python and Qt painting (about 7 ms on an idle machine)."""
+        best = math.inf
+        for _ in range(5):
+            t0 = time.perf_counter()
+            total = 0
+            for i in range(60_000):
+                total += i * i % 7
+            p = QPainter(img)
+            for k in range(400):
+                p.drawLine(0, k, 1000, k)
+            p.end()
+            best = min(best, time.perf_counter() - t0)
+        return best
+
+    # Panning rebuilds everything (~20 ms on an idle machine). The fastest frame measures that
+    # work; the median also measures whatever else the machine is doing (e.g. file syncing).
+    # It is compared with a reference workload timed now, so a busy or throttled machine does
+    # not fail the test (D-506).
+    ref = reference()
+    pan = frames(lambda i: c.set_viewport(c.vp.panned(5, 2), persist=False), fastest=True)
     static = frames(lambda i: None)
     dragging = frames(lambda i: con.set_coords("P_0", -5 + i * 0.01, -2))
-    print(f"pan {pan * 1000:.1f} ms, repaint {static * 1000:.1f} ms, drag {dragging * 1000:.1f} ms")
+    print(f"pan {pan * 1000:.1f} ms ({pan / ref:.1f}x reference), repaint {static * 1000:.1f} ms, "
+          f"drag {dragging * 1000:.1f} ms")
     assert static < 0.005 and dragging < 0.016
-    assert pan < 0.040  # full re-sample and re-stroke of 200 objects and two functions
+    # full re-sample and re-stroke of 200 objects and two functions
+    assert pan < 4 * ref and pan < 0.150
     close(win)
