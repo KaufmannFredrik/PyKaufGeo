@@ -384,3 +384,24 @@ Four overlapping regions; dashed boundaries for <, >, solid for ≥ ∧ ≤.
 ![inspector points](screenshots/m4_dialog_function_inspector_points.png)
 ![freehand](screenshots/m4_freehand_sketch.png)
 A sketch in progress (dashed); released, it becomes Function(<polynomial>, x0, x1).
+
+## 9. M5: CAS view
+
+### Rules
+
+* A row: a black number cell (title colours), a monospace input with a 2 px border, and
+  the output below it after a mode mark (→ exact or kept input, ≈ numeric), typeset with
+  mathtext in the text colour. The current row is yellow with black text (also at night).
+* Errors are a red block with white text (WCAG AA), never red text on white.
+* ``:=`` is typeset as ≔ with thin spaces; products of brackets and functions have no dot.
+* The toolbar uses words where a symbol could be misread (KEEP instead of a check mark
+  that some fonts draw like a square-root sign).
+
+### Screenshots (M5)
+
+![m5 main](screenshots/m5_main.png)
+The CAS below the Algebra view: row 2 defined f (graphed on the right), row 3 is its
+derivative and row 4 solves it via `$3`.
+![m5 night](screenshots/m5_night.png)
+![m5 contrast](screenshots/m5_high_contrast.png)
+![m5 20pt](screenshots/m5_font_20pt.png)

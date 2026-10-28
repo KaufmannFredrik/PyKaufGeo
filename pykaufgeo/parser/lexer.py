@@ -103,6 +103,13 @@ def tokenize(text: str) -> list[Token]:
             space = False
             continue
         # ---- identifiers ------------------------------------------------------
+        if ch == "$":  # CAS row reference: $3 is the output of row 3, $ the previous row
+            i += 1
+            while i < n and text[i].isdigit():
+                i += 1
+            tokens.append(Token(T.IDENT, text[start:i], start, space))
+            space = False
+            continue
         if ch in SPECIAL_IDENTS:
             tokens.append(Token(T.IDENT, SPECIAL_IDENTS[ch], start, space))
             i += 1

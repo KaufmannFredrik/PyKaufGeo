@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 import threading
+from contextvars import ContextVar
 from functools import lru_cache
 from typing import Any, Callable
 
@@ -23,15 +24,19 @@ from pykaufgeo.parser.ast import (
     BoolLit,
     Call,
     Compare,
+    Equation,
     Ident,
+    ListNode,
     Node,
     Num,
     Postfix,
+    TupleNode,
     Unary,
     UndefLit,
 )
 
 TIME_LIMIT = 4.0  # seconds for one symbolic computation
+_STRICT: ContextVar[bool] = ContextVar("sym_bridge_strict", default=True)
 
 # our name -> sympy function name
 _TO_SYMPY = {
@@ -166,8 +171,12 @@ def to_sympy(node: Node) -> Any:  # noqa: C901 - dispatch on node type
 
 
 def _call(node: Call) -> Any:
+    return sympy_function(node.name, [to_sympy(a) for a in node.args])
+
+
+def sympy_function(name: str, args: list[Any]) -> Any:
+    """A predefined function (or If, Min, Max) applied to sympy arguments."""
     sp = sympy()
-    name, args = node.name, [to_sympy(a) for a in node.args]
     if name == "If":
         pieces = [(args[k + 1], args[k]) for k in range(0, len(args) - 1, 2)]
         default = args[-1] if len(args) % 2 == 1 else sp.nan
@@ -194,7 +203,11 @@ def _call(node: Call) -> Any:
 # ----------------------------------------------------------------------- sympy -> tree
 
 def _int(n: int) -> Node:
-    node: Node = Num(float(abs(n)), str(abs(n)))
+    try:
+        value = float(abs(n))
+    except OverflowError:
+        value = math.inf
+    node: Node = Num(value, str(abs(n)))
     return Unary("-", node) if n < 0 else node
 
 
@@ -208,11 +221,14 @@ def _number(v: Any) -> Node:
     if v.is_Integer:
         return _int(int(v))
     if v.is_Rational:
-        frac = Binary("/", Num(float(abs(v.p)), str(abs(v.p))), Num(float(v.q), str(v.q)))
-        return Unary("-", frac) if v.p < 0 else frac
+        frac = Binary("/", _int(abs(v.p)), _int(v.q))
+        return _negate(frac) if v.p < 0 else frac
     if v.is_real:
         f = float(v)
-        node = Num(abs(f))
+        text = None
+        if isinstance(v, sp.Float) and v._prec > 60:   # Numeric(..., n): keep all n digits as text
+            text = sp.Abs(v).__str__()
+        node = Num(abs(f), text)
         return Unary("-", node) if f < 0 else node
     re, im = (float(c) for c in v.as_real_imag())
     return Num(complex(re, im))
@@ -225,8 +241,22 @@ def _negate(node: Node) -> Node:
     return Unary("-", node)
 
 
-def from_sympy(expr: Any) -> Node:  # noqa: C901 - dispatch on sympy type
+def from_sympy(expr: Any, strict: bool = True) -> Node:
+    """Expression tree for a sympy result. ``strict=False`` (the CAS) also accepts
+    equations, lists, matrices, sets and functions PyKaufGeo cannot evaluate (shown by name)."""
+    token = _STRICT.set(strict)
+    try:
+        return _from(expr)
+    finally:
+        _STRICT.reset(token)
+
+
+def _from(expr: Any) -> Node:  # noqa: C901 - dispatch on sympy type
     sp = sympy()
+    if not _STRICT.get():
+        node = _from_structure(expr)
+        if node is not None:
+            return node
     if expr is sp.pi:
         return Ident("π")
     if expr is sp.E:
@@ -241,74 +271,108 @@ def from_sympy(expr: Any) -> Node:  # noqa: C901 - dispatch on sympy type
         return Ident(expr.name)
     if expr.is_Add:
         terms = expr.as_ordered_terms()
-        out = from_sympy(terms[0])
+        out = _from(terms[0])
         for t in terms[1:]:
             if t.could_extract_minus_sign():
-                out = Binary("-", out, from_sympy(-t))
+                out = Binary("-", out, _from(-t))
             else:
-                out = Binary("+", out, from_sympy(t))
+                out = Binary("+", out, _from(t))
         return out
     if expr.is_Mul:
         if expr.could_extract_minus_sign():
-            return _negate(from_sympy(-expr))
+            return _negate(_from(-expr))
         num, den = sp.fraction(expr)
         if den != 1:
-            return Binary("/", from_sympy(num), from_sympy(den))
+            return Binary("/", _from(num), _from(den))
         coeff, rest = expr.as_coeff_Mul()
         factors = sp.Mul.make_args(rest)
-        out = from_sympy(factors[0])
+        out = _from(factors[0])
         for f in factors[1:]:
-            out = Binary("*", out, from_sympy(f))
+            out = Binary("*", out, _from(f))
         if coeff != 1:
-            out = Binary("*", from_sympy(coeff), out)
+            out = Binary("*", _from(coeff), out)
         return out
     if expr.is_Pow:
         base, exp = expr.args
         if base is sp.E:
-            return Binary("^", Ident("e"), from_sympy(exp))
+            return Binary("^", Ident("e"), _from(exp))
         if exp == sp.Rational(1, 2):
-            return Call("sqrt", (from_sympy(base),))
+            return Call("sqrt", (_from(base),))
         if exp.is_Number and exp < 0:
-            return Binary("/", Num(1.0, "1"), from_sympy(base ** -exp))
-        return Binary("^", from_sympy(base), from_sympy(exp))
+            return Binary("/", Num(1.0, "1"), _from(base ** -exp))
+        return Binary("^", _from(base), _from(exp))
     if isinstance(expr, sp.Abs):
-        return Abs(from_sympy(expr.args[0]))
+        return Abs(_from(expr.args[0]))
     if isinstance(expr, sp.exp):
-        return Binary("^", Ident("e"), from_sympy(expr.args[0]))
+        return Binary("^", Ident("e"), _from(expr.args[0]))
     if isinstance(expr, sp.Piecewise):
         args: list[Node] = []
         default: Node | None = None
         for value, cond in expr.args:
             if cond is sp.true:
-                default = from_sympy(value)
+                default = _from(value)
                 break
-            args += [from_sympy(cond), from_sympy(value)]
+            args += [_from(cond), _from(value)]
         if default is not None and not isinstance(default, UndefLit):
             args.append(default)
         return Call("If", tuple(args))
     if isinstance(expr, (sp.Min, sp.Max)) and len(expr.args) == 2:
-        return Call(type(expr).__name__, tuple(from_sympy(a) for a in expr.args))
+        return Call(type(expr).__name__, tuple(_from(a) for a in expr.args))
     if isinstance(expr, sp.And):
-        parts = [from_sympy(a) for a in expr.args]
+        parts = [_from(a) for a in expr.args]
         out = parts[0]
         for p in parts[1:]:
             out = Binary("and", out, p)
         return out
     if isinstance(expr, sp.Or):
-        parts = [from_sympy(a) for a in expr.args]
+        parts = [_from(a) for a in expr.args]
         out = parts[0]
         for p in parts[1:]:
             out = Binary("or", out, p)
         return out
     rel = _CMP_FROM.get(type(expr).__name__)
     if rel is not None:
-        return Compare((rel,), (from_sympy(expr.lhs), from_sympy(expr.rhs)))
+        return Compare((rel,), (_from(expr.lhs), _from(expr.rhs)))
     fname = type(expr).__name__
     if fname == "log" and len(expr.args) == 1:
-        return Call("ln", (from_sympy(expr.args[0]),))
+        return Call("ln", (_from(expr.args[0]),))
     if fname in _FROM_SYMPY:
-        return Call(_FROM_SYMPY[fname], tuple(from_sympy(a) for a in expr.args))
+        return Call(_FROM_SYMPY[fname], tuple(_from(a) for a in expr.args))
+    if not _STRICT.get() and getattr(expr, "args", None) is not None:
+        if isinstance(expr, sp.Function) or isinstance(expr, sp.core.function.AppliedUndef):
+            return Call(fname, tuple(_from(a) for a in expr.args))
+        if isinstance(expr, (sp.Integral, sp.Sum, sp.Product, sp.Limit)):
+            parts = [_from(expr.args[0])]
+            for lim in expr.args[1:]:
+                parts += [_from(v) for v in (lim if isinstance(lim, sp.Tuple) else (lim,))]
+            return Call(fname, tuple(parts))
     raise EvalError(f"The result uses {fname}, which PyKaufGeo cannot evaluate yet.")
+
+
+def _from_structure(expr: Any) -> Node | None:
+    """CAS results that are not plain expressions: equations, lists, matrices, sets."""
+    sp = sympy()
+    if isinstance(expr, (list, tuple)):
+        return ListNode(tuple(_from(e) for e in expr))
+    if isinstance(expr, bool):
+        return BoolLit(expr)
+    if isinstance(expr, sp.MatrixBase):
+        if expr.shape[1] == 1 and expr.shape[0] in (2, 3):       # a column is a point / vector
+            return TupleNode(tuple(_from(e) for e in expr))
+        return ListNode(tuple(ListNode(tuple(_from(e) for e in expr.row(i))) for i in range(expr.shape[0])))
+    if isinstance(expr, sp.Equality):
+        return Equation(_from(expr.lhs), _from(expr.rhs))
+    if isinstance(expr, sp.Tuple):
+        return TupleNode(tuple(_from(e) for e in expr))
+    if isinstance(expr, sp.FiniteSet):
+        return ListNode(tuple(_from(e) for e in sorted(expr, key=sp.default_sort_key)))
+    if expr is sp.S.EmptySet:
+        return ListNode(())
+    if isinstance(expr, sp.Interval):
+        lo, hi = _from(expr.start), _from(expr.end)
+        x = Ident("x")
+        return Compare(("<" if expr.left_open else "<=", "<" if expr.right_open else "<="), (lo, x, hi))
+    return None
 
 
 # ----------------------------------------------------------------------- tidy results

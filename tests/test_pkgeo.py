@@ -32,6 +32,7 @@ def build() -> Document:
     doc.views["graphics"]["xmin"] = -3.5
     doc.spreadsheet["cells"]["A1"] = "1"
     doc.cas["rows"].append({"input": "Solve(x^2 = 4)"})
+    doc.cas_refresh()   # opening a file evaluates the CAS rows; compare evaluated rows
     return doc
 
 

@@ -167,6 +167,11 @@ class MainWindow(QMainWindow):
         if spec.id == "graphics2":
             self.graphics2 = GraphicsBody(self.document, self.selection, "graphics2", "g2")
             return self.graphics2
+        if spec.id == "cas":
+            from pykaufgeo.gui.cas_view import CasView
+
+            self.cas_view = CasView(self.document)
+            return self.cas_view
         return PlaceholderBody(tr(spec.description), spec.milestone)
 
     @property

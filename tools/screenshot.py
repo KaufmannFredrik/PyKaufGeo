@@ -503,6 +503,25 @@ def m4_dialog(out: Path, name: str, tab: int) -> Path:
     return path
 
 
+def m5_main(out: Path, name: str, prefs: Preferences | None = None, focus: int = 3) -> Path:
+    def setup(app, win):
+        win.open_demo("m5")
+        settle(app, 6)
+        win.message.clear_message()
+        win.cas_view.focus_row(focus)
+        settle(app)
+    return shot_main(out, name, prefs, (), setup)
+
+
+def m5_jobs(out: Path) -> dict:
+    return {
+        "m5_main": lambda: m5_main(out, "m5_main"),
+        "m5_night": lambda: m5_main(out, "m5_night", Preferences(night=True)),
+        "m5_contrast": lambda: m5_main(out, "m5_high_contrast", Preferences(high_contrast=True)),
+        "m5_font": lambda: m5_main(out, "m5_font_20pt", Preferences(font_size=20)),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT / "docs" / "screenshots"))
@@ -540,6 +559,7 @@ def main() -> int:
     jobs.update(m2_jobs(out))
     jobs.update(m3_jobs(out))
     jobs.update(m4_jobs(out))
+    jobs.update(m5_jobs(out))
     names = args.only or list(jobs)
     for n in names:
         path = jobs[n]()

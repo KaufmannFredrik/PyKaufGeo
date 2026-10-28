@@ -595,6 +595,24 @@ QListWidget#CompletionList {{ border: none; font-family: {mono}; }}
 QLineEdit#AlgebraEditor {{ border: {b}px solid {c.border}; font-family: {mono}; }}
 QLineEdit#AlgebraEditor[kind="error"] {{ border: {b}px solid {c.error_bg}; }}
 
+/* ---------- CAS view: numbered rows, the current row marked yellow ---------- */
+QWidget#CasRows {{ background: {c.bg}; }}
+QFrame#CasRow {{ background: {c.bg}; border-bottom: {bd}px solid {c.border}; }}
+QFrame#CasRow[current="true"] {{ background: {c.selection_bg}; }}
+QLabel#CasRowNumber {{
+    background: {c.title_bg}; color: {c.title_fg}; font-family: {mono}; font-weight: {FONT_WEIGHT_HEAVY};
+    min-width: {hit + pad}px; padding: {pad}px {pad // 2}px; }}
+QFrame#CasRow[current="true"] QLabel#CasRowNumber {{ background: {c.selection_bg}; color: {c.selection_fg};
+    border-right: {b}px solid {c.border}; }}
+QLineEdit#CasInput {{ border: {bd}px solid {c.border}; font-family: {mono}; background: {c.bg}; color: {c.fg}; }}
+QLabel#CasMark {{ color: {c.fg}; font-weight: {FONT_WEIGHT_HEAVY}; font-size: {large_pt}; background: transparent; }}
+QLabel#CasOutput {{ color: {c.fg}; background: transparent; padding: {pad // 2}px 0; }}
+QLabel#CasOutput[kind="error"] {{ background: {c.error_bg}; color: {c.error_fg}; font-weight: {FONT_WEIGHT_HEAVY};
+    padding: {pad // 2}px {pad}px; }}
+QLabel#CasNote {{ color: {c.fg}; background: transparent; font-family: {mono}; }}
+QFrame#CasRow[current="true"] QLabel#CasMark, QFrame#CasRow[current="true"] QLabel#CasNote,
+QFrame#CasRow[current="true"] QLabel#CasOutput {{ color: {c.selection_fg}; }}
+
 /* ---------- frameless brutalist dialogs ---------- */
 QWidget#DialogBody {{ background: {c.bg}; }}
 QWidget#DialogTitleBar {{ background: {c.title_bg}; }}

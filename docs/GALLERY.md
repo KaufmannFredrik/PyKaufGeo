@@ -13,6 +13,22 @@ dist/PyKaufGeo.exe --demo         # the built program (python build.py)
 
 or use Help > Milestone Demos in the app. Demos open unsaved; nothing is overwritten.
 
+## M5: CAS view
+
+**Try it:** `python -m pykaufgeo --demo m5`. Type in a CAS row: Enter gives the exact result, Ctrl+Enter a decimal one, Alt+Enter keeps the input. $3 means the result of row 3. f(x) := ... also defines the function f for the Graphics view. Drag the slider a: row 1 is solved again.
+
+![M5 demo](screenshots/demo_m5.png)
+
+<details>
+<summary>Design review screenshots (4)</summary>
+
+<table>
+<tr><td><a href="screenshots/m5_font_20pt.png"><img src="screenshots/m5_font_20pt.png" width="280"></a><br><code>m5_font_20pt</code></td><td><a href="screenshots/m5_high_contrast.png"><img src="screenshots/m5_high_contrast.png" width="280"></a><br><code>m5_high_contrast</code></td><td><a href="screenshots/m5_main.png"><img src="screenshots/m5_main.png" width="280"></a><br><code>m5_main</code></td></tr>
+<tr><td><a href="screenshots/m5_night.png"><img src="screenshots/m5_night.png" width="280"></a><br><code>m5_night</code></td></tr>
+</table>
+
+</details>
+
 ## M4: Calculus/analysis commands, implicit and parametric curves, inequalities
 
 **Try it:** `python -m pykaufgeo --demo m4`. Drag the slider a: f, its derivative f' (dashed), the roots, extrema and the shaded integral follow. Type Derivative(f), Integral(f), Limit(sin(x) / x, 0) or NSolve(cos(x) = x) in the input bar; try the Roots, Extremum and Function Inspector tools, and sketch a graph with Freehand Shape.

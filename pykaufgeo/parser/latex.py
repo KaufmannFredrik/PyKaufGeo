@@ -100,8 +100,13 @@ class _Latex:
     def num(self, node: Num) -> str:
         from pykaufgeo.core.format import format_complex, format_number
 
+        from pykaufgeo.parser.unparse import exact_digits
+
         if isinstance(node.value, complex):
             return neg_number(format_complex(node.value, self.decimals).replace("∞", r"\infty"))
+        exact = exact_digits(node.text, self.decimals)
+        if exact is not None:
+            return exact
         return neg_number(format_number(float(node.value), self.decimals).replace("∞", r"\infty"))
 
     def wrap(self, child: Node, need: bool) -> str:
@@ -177,6 +182,8 @@ class _Latex:
         prec = PREC_BINARY[op]
         lp, rp = precedence(node.left), precedence(node.right)
         if op == "/":
+            if isinstance(node.left, Unary) and node.left.op == "-":   # -1/2 as -\frac{1}{2}
+                return r"-\frac{" + self.p(node.left.operand) + "}{" + self.p(node.right) + "}"
             return r"\frac{" + self.p(node.left) + "}{" + self.p(node.right) + "}"
         if op == "^":
             left = self.wrap(node.left, lp <= prec or isinstance(node.left, Binary) and node.left.op == "/")
@@ -199,4 +206,5 @@ class _Latex:
             return False
         if isinstance(left, Num):
             return not (isinstance(right, Binary) and right.op == "*" and isinstance(right.left, Num))
-        return isinstance(left, (Ident, Binary, Postfix, Abs)) and isinstance(right, (Ident, Call, Apply, Abs, Binary))
+        return isinstance(left, (Ident, Binary, Postfix, Abs, Call, Apply)) and \
+            isinstance(right, (Ident, Call, Apply, Abs, Binary))

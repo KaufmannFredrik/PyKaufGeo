@@ -357,3 +357,32 @@ are mapped by substituting the inverse map into their equation.
 **D-408 Freehand functions.** A sketch that goes left to right (95 % of its steps) becomes
 `Function(<polynomial>, x0, x1)` with the lowest degree up to 6 that follows the
 stroke within 3 px. There are no table-based freehand functions.
+
+## M5
+
+**D-501 CAS rules.** The CAS uses sympy (D-401) with GeoGebra's CAS conventions: names
+without a definition are symbols; a name made of several letters with no definition is
+a product (xy = x·y); typed decimals are exact (0.1 + 0.2 = 3/10); ``=`` makes an
+equation and ``:=`` an assignment; results are not simplified unless a command asks
+(Simplify, Factor, Expand), except that numbers with i are multiplied out.
+
+**D-502 Rows and references.** A row is ``{input, mode}`` plus its results; the session
+evaluates all rows top to bottom with one scope, so ``$n`` (dynamic) always shows row n's
+current result. ``#n`` is static: the result is pasted as text when the row is entered.
+Inserting or deleting rows renumbers ``$n`` references.
+
+**D-503 Sharing with the construction.** CAS rows read construction objects by value
+(numbers as exact fractions when they are simple, points as column vectors, functions
+by their expression). ``a := 5`` and ``f(x) := ...`` are also executed in the
+construction (a = 5, f(x) = ...) when the row is entered, in the same undo step; if that
+fails the row says "Only in the CAS". Rows that read construction objects are evaluated
+again (80 ms after a change) without exporting, so nothing loops.
+
+**D-504 Solutions.** Solve returns equations ({x = -2, x = 2}) and keeps only real
+solutions (symbolic ones whose reality cannot be decided are kept); CSolve keeps complex
+ones; periodic equations give sympy's principal solutions, not GeoGebra's general
+solution with an integer parameter. NSolve uses numeric roots (all of a polynomial,
+otherwise those between -100 and 100, or Newton from a start value).
+
+**D-505 Limits.** Every CAS row runs with a 10 s limit (D-401); integer powers with more
+than 100000 binary digits are refused before they are computed.

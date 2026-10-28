@@ -137,7 +137,7 @@ build.py               PyInstaller one-file build
 | M2 | 2D graphics view, input bar, algebra view | done |
 | M3 | Full tool set, transformations, conics, polygons, locus, sliders, animation, styling, properties | done |
 | M4 | Calculus/analysis commands, implicit and parametric curves, inequalities | done |
-| M5 | CAS view | not started |
+| M5 | CAS view | done |
 | M6 | Spreadsheet, statistics, regression, probability calculator | not started |
 | M7 | 3D view | not started |
 | M8 | Protocol, scripting, action objects, translations, export, Night/high contrast polish | not started |
@@ -280,3 +280,26 @@ a milestone is marked done without a demo or if docs/GALLERY.md is stale.
 * Not done: intersections with parametric or implicit curves; adaptive refinement of
   implicit curves below the 3 px cell; the CAS view (M5).
 * Next: M5 (CAS view).
+
+### M5: CAS view (2026-10-28)
+
+* `pykaufgeo/cas/`: input trees to sympy with CAS rules (undefined names are symbols,
+  ``xy`` is x·y, decimals are exact, ``$n`` / ``$`` read earlier rows, construction
+  objects are used by value), 50 commands (solving, algebra, calculus, transforms,
+  matrices, polynomials), a session that evaluates rows top to bottom.
+* Rows: exact, numeric (≈) and keep-input modes; ``:=`` assignments define CAS names
+  and become construction objects (shown and graphed); ``=`` is an equation; ``#n``
+  copies a result as text; inserting or deleting rows renumbers ``$n``.
+* The CAS view: numbered rows, mathtext output, toolbar, keyboard (Enter, Ctrl+Enter,
+  Alt+Enter, Up/Down), the current row highlighted; rows reading construction objects
+  are evaluated again when those objects change. Rows are undo steps and are saved.
+* Display improvements found on the way (they help every view): products of brackets
+  and functions without a dot, ``(x - 3)(x - 2)``, ``cos(x) sin(x)``; exact big integers
+  and high-precision decimals; ``-1/2`` as ``-\frac{1}{2}``; ``(3 + 2i)(1 - i)`` → ``5 - i``.
+* Design review fixes: unreadable output on the highlighted row at night, rows squeezed
+  at 20 pt, the ✓ glyph falling back to a √-like shape, ``:=`` spaced as ``: =``,
+  a huge power (2^(10^10)) blocking for a minute.
+* Test suite: 561 tests in about 50 s (`test_m5_cas`, `test_m5_view`).
+* Not done: autocomplete and command help inside CAS rows; general solutions with
+  integer parameters for periodic equations (sympy gives the principal ones).
+* Next: M6 (spreadsheet, statistics, regression, probability calculator).

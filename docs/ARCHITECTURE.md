@@ -263,6 +263,19 @@ paintEvent: base layer + trace layer (D-311) + live drawables + halos + tool pre
   `gui/graphics/shapes_analysis.py` (paths, region images); drawable kind `region`.
 * `gui/function_inspector.py`: the Function Inspector dialog.
 
+## CAS (M5)
+
+```
+CasView (gui/cas_view.py) --Enter--> Document.cas_evaluate(index, text, mode)   one undo step
+    Document.cas["rows"] = [{input, mode, output, value_text, latex, error, note, labels}]
+    CasSession.evaluate(rows, export_from)       cas/session.py: top to bottom, one CasScope
+        parse_statement -> to_cas (cas/convert.py) -> sympy -> CAS_COMMANDS (cas/commands.py)
+        result -> sym_bridge.from_sympy(strict=False) -> to_display / to_latex
+        := assignments -> Construction.execute (export)
+    CasChanged event -> CasView.sync()
+ElementsUpdated for labels a row reads -> CasView (debounced) -> Document.cas_refresh()
+```
+
 ## GUI (M0/M1)
 
 * `gui/app.py`: QApplication with Fusion, all UI effects off, font substitutions,

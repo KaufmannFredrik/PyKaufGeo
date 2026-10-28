@@ -86,6 +86,11 @@ class AnimationCommand(Event):
 
 
 @dataclass(frozen=True)
+class CasChanged(Event):
+    """The CAS rows changed (entered, deleted, re-evaluated, undone or loaded)."""
+
+
+@dataclass(frozen=True)
 class DocumentChanged(Event):
     modified: bool
     path: str | None

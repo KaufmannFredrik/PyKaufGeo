@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from pykaufgeo.core.construction import Construction
-from pykaufgeo.core.events import DocumentChanged, EventBus, UndoStateChanged, ViewSettingsChanged
+from pykaufgeo.core.events import CasChanged, DocumentChanged, EventBus, UndoStateChanged, ViewSettingsChanged
 from pykaufgeo.core.undo import DEFAULT_LIMIT, UndoManager
 from pykaufgeo.core.values import ImageValue
 from pykaufgeo.io.pkgeo import ASSET_NAME, read_pkgeo, read_pkgeo_assets, write_pkgeo
@@ -46,6 +46,7 @@ class Document:
         self.modified = False
         self.thumbnail: bytes | None = None
         self.assets: dict[str, bytes] = {}  # pictures for Image objects (kept until the document is closed)
+        self._cas_session = None
         self.undo = UndoManager(self.undo_state, self.restore_undo_state, undo_limit, self._undo_changed)
         self.undo.reset()
         self._action_description = ""
@@ -71,7 +72,9 @@ class Document:
     def restore_undo_state(self, snap: dict) -> list[str]:
         self.spreadsheet = copy.deepcopy(snap.get("spreadsheet") or {"cells": {}})
         self.cas = copy.deepcopy(snap.get("cas") or {"rows": []})
-        return self.construction.load_dict(snap.get("construction", {}))
+        errors = self.construction.load_dict(snap.get("construction", {}))
+        self.bus.emit(CasChanged())
+        return errors
 
     def restore(self, snap: dict) -> list[str]:
         """Load file sections: view settings first, so views see them on the reset event."""
@@ -199,6 +202,72 @@ class Document:
         self.assets[name] = data
         return name
 
+    # ------------------------------------------------------------------ CAS
+    @property
+    def cas_rows(self) -> list[dict]:
+        rows = self.cas.setdefault("rows", [])
+        return rows
+
+    def cas_session(self):
+        if self._cas_session is None:
+            from pykaufgeo.cas.session import CasSession
+
+            self._cas_session = CasSession(self.construction)
+        return self._cas_session
+
+    def cas_evaluate(self, index: int, text: str, mode: str = "exact") -> None:
+        """Enter CAS row ``index`` (one undo step); the rows below are evaluated again and
+        assignments (a := 5, f(x) := ...) become objects of the construction."""
+        from pykaufgeo.cas.session import MODES, blank_row, expand_static_references
+
+        if mode not in MODES:
+            raise ValueError(mode)
+
+        def action() -> None:
+            rows = self.cas_rows
+            while len(rows) <= index:
+                rows.append(blank_row())
+            rows[index] = {"input": expand_static_references(text, rows, index), "mode": mode}
+            self.cas_session().evaluate(rows, export_from=index)
+            self.bus.emit(CasChanged())
+
+        self.run(f"CAS row {index + 1}", action)
+
+    def cas_insert(self, index: int) -> None:
+        """Insert an empty row; references $n to the rows below are renumbered."""
+        from pykaufgeo.cas.session import blank_row, shift_references
+
+        def action() -> None:
+            rows = self.cas_rows
+            for row in rows:
+                row["input"] = shift_references(row.get("input", ""), index + 1, 1)
+            rows.insert(min(index, len(rows)), blank_row())
+            self.cas_session().evaluate(rows)
+            self.bus.emit(CasChanged())
+
+        self.run(f"Insert CAS row {index + 1}", action)
+
+    def cas_delete(self, index: int) -> None:
+        from pykaufgeo.cas.session import shift_references
+
+        def action() -> None:
+            rows = self.cas_rows
+            if not 0 <= index < len(rows):
+                return
+            rows.pop(index)
+            for row in rows:
+                row["input"] = shift_references(row.get("input", ""), index + 2, -1)
+            self.cas_session().evaluate(rows)
+            self.bus.emit(CasChanged())
+
+        self.run(f"Delete CAS row {index + 1}", action)
+
+    def cas_refresh(self) -> None:
+        """Evaluate the rows again (objects they read changed). Not an undo step."""
+        if self.cas_rows:
+            self.cas_session().evaluate(self.cas_rows)
+            self.bus.emit(CasChanged())
+
     # ------------------------------------------------------------------ files
     def new(self) -> None:
         self.views = default_views()
@@ -206,6 +275,7 @@ class Document:
         self.construction.clear()
         self.spreadsheet = {"cells": {}}
         self.cas = {"rows": []}
+        self.bus.emit(CasChanged())
         self.path = None
         self.thumbnail = None
         self.assets = {}
@@ -225,6 +295,7 @@ class Document:
         data, thumb = read_pkgeo(path)
         self.assets = read_pkgeo_assets(path)
         errors = self.restore(data)
+        self.cas_refresh()
         self.path = Path(path)
         self.thumbnail = thumb
         self.undo.reset()

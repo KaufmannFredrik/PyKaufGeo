@@ -119,9 +119,12 @@ def run(argv: list[str] | None = None) -> int:
 
             mathtext = math_renderer().image(r"\frac{x^{2}}{2}", theme.FONT_SIZE_DEFAULT, theme.BLACK) is not None
             count = len(win.document.construction)
+            rows = win.document.cas_rows
+            cas = f", {len(rows)} CAS rows ({sum(1 for r in rows if r.get('error'))} errors)" if rows else ""
             win.document.modified = False  # smoke runs never prompt
             win.close()
-            line = f"PyKaufGeo {__version__} smoke run OK: {count} objects, mathtext {'OK' if mathtext else 'FAILED'}"
+            line = (f"PyKaufGeo {__version__} smoke run OK: {count} objects{cas}, "
+                    f"mathtext {'OK' if mathtext else 'FAILED'}")
             print(line)
             if report:
                 Path(report).write_text(line + "\n", encoding="utf-8")

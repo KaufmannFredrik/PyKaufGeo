@@ -56,6 +56,22 @@ def precedence(node: Node) -> int:
     return 100
 
 
+def exact_digits(text: str | None, decimals: int) -> str | None:
+    """Digits of a number with more than 15 significant digits (e.g. 30! or Numeric(π, 20)),
+    rounded to ``decimals``; None for ordinary numbers (shown through floats)."""
+    if not text or not all(ch.isdigit() or ch == "." for ch in text) or text.count(".") > 1:
+        return None
+    if len(text.replace(".", "").lstrip("0")) <= 15:
+        return None
+    from decimal import ROUND_HALF_UP, Decimal
+
+    if "." not in text:
+        return text
+    rounded = Decimal(text).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
+    out = format(rounded, "f")
+    return out.rstrip("0").rstrip(".") if "." in out else out
+
+
 def format_float_input(v: float) -> str:
     if math.isnan(v):
         return "?"
@@ -118,6 +134,9 @@ class _Printer:
 
         if isinstance(node.value, complex):
             return format_complex(node.value, self.decimals)
+        exact = exact_digits(node.text, self.decimals)
+        if exact is not None:
+            return exact   # CAS: big integers and high-precision decimals keep their digits
         return format_number(float(node.value), self.decimals)
 
     def wrap(self, child: Node, need: bool) -> str:
@@ -197,8 +216,9 @@ class _Printer:
         right = self.wrap(node.right, rp < prec if assoc else rp <= prec)
         if op == "*":
             if self.display and self._juxtapose(node.left, node.right, rp <= prec):
-                # "3x y", not "3xy" (which would read as a name); "x²y" needs no space.
-                gap = " " if right[:1].isalpha() and left[-1:].isalpha() else ""
+                # "3x y", not "3xy" (which would read as a name); "x²y" needs no space;
+                # "cos(x) sin(x)" keeps a space after a function call.
+                gap = " " if right[:1].isalpha() and (left[-1:].isalpha() or left[-1:] == ")") else ""
                 return f"{left}{gap}{right}"
             if self.edit and node.implicit and self._juxtapose(node.left, node.right, rp <= prec):
                 gap = " " if (left[-1:].isalpha() and right[:1].isalnum()) or (
@@ -217,8 +237,11 @@ class _Printer:
             return False
         if isinstance(left, Num) and isinstance(right, (Ident, Call, Apply, Binary, Abs)):
             return not (isinstance(right, Binary) and right.op == "*" and isinstance(right.left, Num))
-        if isinstance(left, (Ident, Binary, Postfix)) and isinstance(right, (Ident, Call, Apply, Abs)):
+        if isinstance(left, (Ident, Binary, Postfix, Call, Apply)) and isinstance(right, (Ident, Call, Apply, Abs)):
             return True
+        if isinstance(left, Binary) and left.op in ("+", "-", "*", "^") and isinstance(right, Binary) \
+                and right.op in ("+", "-"):
+            return True   # (x - 3)(x - 2), (x + 1)(x² + 1)(x - 1), 2x(x - 1)
         if isinstance(left, (Ident, Binary)) and isinstance(right, Binary) and right.op == "^"                 and isinstance(right.left, Ident):
             return True
         return False

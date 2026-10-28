@@ -8,9 +8,9 @@ Test names refer to files in `tests/`.
 ## Deliverables
 
 - [x] App launches with `python -m pykaufgeo` (also `python -m pykaufgeo file.pkgeo`) (M0): test_gui_smoke::test_python_m_pykaufgeo_launches
-- [x] `.pkgeo` format: zip with JSON construction, view settings, styles, spreadsheet, CAS rows, PNG thumbnail (M1): test_pkgeo::test_round_trip_preserves_everything, test_file_layout_and_version. The spreadsheet and CAS sections are stored and round-tripped; their views arrive in M5/M6.
+- [x] `.pkgeo` format: zip with JSON construction, view settings, styles, spreadsheet, CAS rows, PNG thumbnail (M1): test_pkgeo::test_round_trip_preserves_everything, test_file_layout_and_version. CAS rows are evaluated again when a file opens (test_m5_cas::test_cas_rows_are_saved); the spreadsheet view arrives in M6.
 - [x] `.pkgeo` format version and migration hook (M1): test_pkgeo::test_migration_hook, test_newer_and_unmigratable_versions
-- [x] `build.py` builds one-file `PyKaufGeo` executable with PyInstaller and prints the path (M0; polish in M9): rebuilt after M4 as `dist/PyKaufGeo.exe` (103 MB with sympy) on Windows 11; `--demo m4 --quit-after --smoke-report` opened the M4 demo (12 objects, including a sympy derivative) and typeset a formula with mathtext (exit code 0)
+- [x] `build.py` builds one-file `PyKaufGeo` executable with PyInstaller and prints the path (M0; polish in M9): rebuilt after M5 as `dist/PyKaufGeo.exe` (103 MB with sympy) on Windows 11; `--demo m5 --quit-after --smoke-report` opened the M5 demo (2 objects, 11 CAS rows with 0 errors, one of them exported to the construction) and typeset a formula with mathtext (exit code 0)
 - [x] Milestone demos and gallery: `python -m pykaufgeo --demo [mN]` and Help > Milestone Demos open a ready-made construction per finished milestone; `tools/gallery.py` writes docs/GALLERY.md with their screenshots (test_demos)
 - [~] Build notes for Linux and macOS (M9): written in the build.py docstring; not tried on those systems
 - [ ] Export graphics: PNG (M8)
@@ -79,7 +79,7 @@ Test names refer to files in `tests/`.
 - [x] Autocomplete and argument hints generated from registry (M2): test_input_bar, m2_autocomplete.png, m2_argument_hint.png
 - [x] docs/COMMANDS.md generated from registry (M1): test_docs::test_commands_md_is_up_to_date
 - [x] Undo/redo for every action so far, at least 200 steps: test_undo (200 steps, random sequences); input, edits, renames, deletes, style toggles, label drags, object drags, tool actions, Properties changes and action commands are one step each (test_graphics_view, test_algebra_view, test_m3_tools, test_m3_ui); cancelled tool actions leave nothing behind (Document.abort_action); view changes and animation frames are deliberately not undo steps (D-201, D-310)
-- [~] Event bus syncing all views: Algebra, Graphics and Graphics 2 stay in sync (test_graphics_view, test_algebra_view); view and animation commands travel as events (ViewCommand, AnimationCommand); CAS, spreadsheet, 3D and protocol subscribe when they land
+- [~] Event bus syncing all views: Algebra, Graphics and Graphics 2 stay in sync (test_graphics_view, test_algebra_view); view and animation commands travel as events (ViewCommand, AnimationCommand); the CAS view follows CasChanged and re-evaluates rows that read changed objects (test_m5_view::test_rows_follow_construction_objects); spreadsheet, 3D and protocol subscribe when they land
 
 ## Object types
 
@@ -126,7 +126,7 @@ Value model means the type is created, evaluated, saved and shown in the algebra
 - [x] 2D Graphics view (two instances): pan, zoom at cursor, rectangle zoom (test_graphics_view::test_wheel_and_rectangle_zoom, test_drag_on_empty_space_pans_without_undo, test_graphics2_is_independent, m2_two_graphics_views.png)
 - [x] Axes with 1-2-5 ticks, cartesian/polar/isometric grids, axis ratio lock, snapping, labels (test_render::test_nice_step_is_1_2_5, test_graphics_view::test_every_grid_mode_paints, test_zoom_tools_and_move_view_axis_stretch, test_point_tool_snaps_and_is_one_undo_step, m2_polar_grid.png)
 - [ ] 3D Graphics view (M7)
-- [ ] CAS view (M5)
+- [~] CAS view: numbered rows with exact (Enter), numeric (Ctrl+Enter) and keep-input (Alt+Enter) evaluation, results typeset with mathtext, $n / $ dynamic and #n static row references, := assignments shared with the construction, toolbar (=, ≈, KEEP, SOLVE, INSERT, DELETE), Up/Down between rows, undo, files (test_m5_cas, test_m5_view, m5_main.png). No autocomplete or command help inside CAS rows yet
 - [ ] Spreadsheet (M6)
 - [ ] Probability calculator (M6)
 - [ ] Construction protocol (M8)
@@ -231,15 +231,16 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 - [x] ImplicitCurve: test_m4_calculus::test_curves_implicit_curves_and_regions
 
 ### CAS (M5)
-- [ ] Solve, Solutions
-- [ ] Simplify, Factor, Expand
-- [ ] Substitute
-- [ ] Limit, Sum, Integral, Derivative (symbolic)
-- [ ] LaplaceTransform
-- [ ] Eliminate
-- [~] Determinant, Inverse, Eigenvalues, Eigenvectors: numeric Determinant and Invert/Inverse plus Transpose exist (test_commands); exact versions and eigen commands in M5
-- [~] Matrix and vector operations: numeric +, -, *, ^, ^-1, matrix times point (test_evaluator::test_matrices); symbolic in M5
-- [~] Complex functions: numeric real, imaginary, conjugate, arg, abs, sqrt, exp, ln (test_evaluator::test_complex_numbers); CAS in M5
+- [x] Solve, Solutions, CSolve, CSolutions, NSolve, NSolutions (equations, systems, inequalities; real solutions unless C...): test_m5_cas::test_solve_family
+- [x] Simplify, Factor (also whole numbers), CFactor, Expand, PartialFractions: test_m5_cas::test_exact_results, test_against_sympy
+- [x] Substitute (one value, an equation or a list of equations): test_m5_cas::test_against_sympy
+- [x] Limit (also one-sided), Sum, Product, Integral (antiderivative, exact definite), Derivative (also partial, n-th), TaylorPolynomial: test_m5_cas::test_against_sympy
+- [x] Laplace (alias LaplaceTransform), InverseLaplace: test_m5_cas::test_against_sympy
+- [x] Eliminate (Gröbner basis): test_m5_cas::test_eliminate
+- [x] Determinant, Invert / Inverse, Transpose, Eigenvalues, Eigenvectors, Rank (exact, symbolic entries): test_m5_cas::test_matrices, test_against_sympy
+- [x] Matrix and vector operations: exact +, -, ·, ^-1, matrix product, Dot, Cross; numeric ones in the construction (test_evaluator::test_matrices, test_m5_cas::test_matrices)
+- [x] Complex numbers: exact i arithmetic, CSolve, CFactor; numeric functions in the construction (test_m5_cas::test_exact_results, test_solve_family)
+- [x] Polynomial tools: Numerator, Denominator, Degree, Coefficients, Div, Mod, GCD, LCM; Numeric(expr, digits): test_m5_cas::test_against_sympy, test_numeric_and_keep_modes
 
 ### Statistics (M6)
 - [ ] Mean, Median, SD, Variance, Quartiles
@@ -300,7 +301,7 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 - [x] Tests: parser incl. odd inputs (M1): test_parser
 - [x] Tests: dependency order (M1): test_construction
 - [~] Tests: geometric commands against known results: every implemented geometry command (test_commands, test_m3_model); grows per milestone
-- [~] Tests: calculus against known results and numeric differentiation (M4, test_m4_calculus); CAS in M5
+- [x] Tests: calculus against known results and numeric differentiation (M4, test_m4_calculus); CAS results compared with sympy (M5, test_m5_cas::test_against_sympy)
 - [x] Tests: save/load round trips (M1): test_pkgeo
 - [x] Tests: undo/redo invariants (M1): test_undo
 - [x] Tests: theme token check (M0): test_theme_tokens

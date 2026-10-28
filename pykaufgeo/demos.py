@@ -15,6 +15,7 @@ from typing import Callable
 
 from pykaufgeo.core.construction import Construction
 from pykaufgeo.core.document import Document
+from pykaufgeo.core.events import CasChanged
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class Demo:
     setup: Callable[[Construction], None] | None = None
     views: tuple[str, ...] = field(default_factory=tuple)  # extra panels to show
     window: tuple[float, float, float, float] | None = None  # x min, y min, x max, y max (else Show All)
+    cas: tuple[tuple[str, str], ...] = field(default_factory=tuple)  # CAS rows (input, mode)
 
 
 # ----------------------------------------------------------------------- M1
@@ -111,7 +113,26 @@ M4 = Demo(
 )
 
 
-DEMOS: dict[str, Demo] = {d.key: d for d in (M1, M2, M3, M4)}
+# ----------------------------------------------------------------------- M5
+
+M5 = Demo(
+    "m5", "M5: CAS view",
+    "Type in a CAS row: Enter gives the exact result, Ctrl+Enter a decimal one, Alt+Enter keeps the input. "
+    "$3 means the result of row 3. f(x) := ... also defines the function f for the Graphics view. "
+    "Drag the slider a: row 1 is solved again.",
+    ("a = Slider(-3, 3, 0.5)",),
+    cas=(
+        ("Solve(x^2 + a x - 6 = 0)", "exact"), ("f(x) := x^3 - 3x^2 + 2", "exact"), ("Derivative(f(x))", "exact"),
+        ("Solve($3 = 0)", "exact"), ("Integral(f(x), 0, 2)", "exact"), ("Factor(x^4 - 1)", "exact"),
+        ("Solve({x + 2y = 5, 3x - y = 1}, {x, y})", "exact"), ("Eigenvalues({{2, 1}, {1, 2}})", "exact"),
+        ("sqrt(2) + sqrt(8)", "exact"), ("sqrt(2) + sqrt(8)", "numeric"), ("Limit((1 + 1/n)^n, n, ∞)", "exact"),
+    ),
+    views=("cas",),
+    window=(-3.0, -3.0, 4.0, 4.0),
+)
+
+
+DEMOS: dict[str, Demo] = {d.key: d for d in (M1, M2, M3, M4, M5)}
 LATEST = list(DEMOS)[-1]
 
 
@@ -124,5 +145,9 @@ def load_demo(document: Document, key: str | None = None) -> Demo:
         c.execute(line)
     if demo.setup is not None:
         demo.setup(c)
+    if demo.cas:
+        document.cas["rows"] = [{"input": text, "mode": mode} for text, mode in demo.cas]
+        document.cas_session().evaluate(document.cas_rows, export_from=0)
+        document.bus.emit(CasChanged())
     document.undo.reset()
     return demo

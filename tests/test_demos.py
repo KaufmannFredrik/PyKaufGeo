@@ -36,8 +36,9 @@ def test_demo_builds_cleanly(key) -> None:
     doc = Document(seed=1)
     demo = load_demo(doc, key)
     c = doc.construction
-    assert len(c) >= 10 and demo.hint and demo.title.upper().startswith(key.upper())
+    assert len(c) + len(doc.cas_rows) >= 10 and demo.hint and demo.title.upper().startswith(key.upper())
     assert [el.label for el in c if not el.is_defined or el.error] == []
+    assert [r["input"] for r in doc.cas_rows if r.get("error")] == []
     assert not doc.modified and not doc.undo.can_undo and doc.path is None
 
 
