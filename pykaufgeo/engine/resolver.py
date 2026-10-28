@@ -64,12 +64,22 @@ class Resolver:
             return node
         if name in CONSTANTS:
             return node
-        if name.endswith("'") and name.rstrip("'") in self.labels:
-            raise EvalError(f"Derivatives ({name}) arrive with the calculus commands in M4.")
+        derived = self.derivative(name)
+        if derived is not None:
+            return derived
         pieces = split_identifier(name, lambda s: self.is_known(s, bound))
         if pieces is not None:
             return self.product(pieces, bound)
         raise UndefinedVariableError(f"Undefined variable: {name}")
+
+    def derivative(self, name: str) -> Node | None:
+        """``f'`` -> Derivative(f), ``f''`` -> Derivative(f, 2) for a function f."""
+        base = name.rstrip("'")
+        n = len(name) - len(base)
+        if not n or self.labels.get(base) not in (GeoType.FUNCTION, GeoType.FUNCTION_NVAR, GeoType.UNKNOWN):
+            return None
+        self.deps.add(base)
+        return derivative_call(base, n)
 
     def product(self, pieces: list[str], bound: frozenset[str]) -> Node:
         nodes: list[Node] = []
@@ -112,14 +122,30 @@ class Resolver:
             if self.labels[name] in APPLICABLE:
                 return Apply(Ident(name), args)
             return Binary("*", Ident(name), _group(args), implicit=True)
-        if name.endswith("'") and name.rstrip("'") in self.labels:
-            raise EvalError(f"Derivatives ({name}) arrive with the calculus commands in M4.")
+        derived = self.derivative(name)
+        if derived is not None:
+            return Apply(derived, args)
         pieces = split_identifier(name, lambda s: self.is_known(s, bound) or _callable_name(s))
         if pieces is not None and len(pieces) > 1:
             head = self.product(pieces[:-1], bound)
             tail = self.call(Call(pieces[-1], node.args), bound)
             return Binary("*", head, tail, implicit=True)
         raise EvalError(f"Unknown command or function: {name}")
+
+
+def derivative_call(base: str, n: int) -> Call:
+    return Call("Derivative", (Ident(base),) if n == 1 else (Ident(base), Num(float(n), str(n))))
+
+
+def prime_name(node: Node) -> str | None:
+    """``f''`` for Derivative(f, 2) (how derivatives are written back), else None."""
+    if isinstance(node, Call) and node.name == "Derivative" and node.args and isinstance(node.args[0], Ident):
+        if len(node.args) == 1:
+            return node.args[0].name + "'"
+        k = node.args[1]
+        if len(node.args) == 2 and isinstance(k, Num) and k.value in (2.0, 3.0):
+            return node.args[0].name + "'" * int(k.value)
+    return None
 
 
 def _group(args: tuple[Node, ...]) -> Node:

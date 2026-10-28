@@ -27,7 +27,9 @@ if TYPE_CHECKING:
 
 def shows_in_graphics(el) -> bool:
     """Objects with a visibility toggle: drawable types, lists, sliders and slope triangles."""
-    return (el.geo_type in GRAPHICAL_2D or el.geo_type is GeoType.LIST
+    from pykaufgeo.core.values import AreaValue
+
+    return (el.geo_type in GRAPHICAL_2D or el.geo_type is GeoType.LIST or isinstance(el.value, AreaValue)
             or el.extras.get("slider") is not None or bool(el.extras.get("triangle")))
 
 

@@ -62,7 +62,9 @@ KINDS: dict[str, tuple[Pred, str]] = {
     "list": (_value_is(V.ListValue), "a list"),
     "path_point": (lambda c, label: is_path_point(c, label), "a point on an object"),
     "path": (lambda c, label: paths.is_path(c[label].value), "an object"),
-    "intersectable": (_value_is(V.Line, V.Segment, V.Ray, V.Circle, V.Conic, V.ArcValue), "a line, circle or conic"),
+    "intersectable": (lambda c, label: isinstance(c[label].value, (V.Line, V.Segment, V.Ray, V.Circle, V.Conic,
+                                                                    V.ArcValue)) or _function(c, label),
+                      "a line, circle, conic or graph"),
     "object": (lambda c, label: True, "an object"),
     "transformable": (_transformable, "an object"),
 }
@@ -365,6 +367,49 @@ def _relation(tool: BuildTool, labels: list[str], answer: str | None) -> list[st
     return []
 
 
+def _view_range(tool: BuildTool) -> tuple[str, str]:
+    from pykaufgeo.parser.unparse import format_float_input
+
+    vp = tool.c.vp
+    return format_float_input(round(vp.xmin, 2)), format_float_input(round(vp.xmax, 2))
+
+
+def _analysis(command: str, interval_command: str) -> Callable:
+    """Root / Extremum tools: all of them for polynomials, otherwise those in the visible x-range."""
+    def build(tool: BuildTool, labels: list[str], answer: str | None) -> list[str]:
+        from pykaufgeo.engine.analysis import poly_coeffs
+
+        c = tool.c.document.construction
+        f = labels[0]
+        if poly_coeffs(c[f].value) is not None:
+            return c.execute(f"{command}({f})")
+        a, b = _view_range(tool)
+        return c.execute(f"{interval_command}({f}, {a}, {b})")
+    return build
+
+
+def _inspect(tool: BuildTool, labels: list[str], answer: str | None) -> list[str]:
+    from pykaufgeo.gui import function_inspector
+
+    vp = tool.c.vp
+    function_inspector.open_inspector(tool.c, tool.c.document, labels[0], round(vp.xmin, 2), round(vp.xmax, 2))
+    return []
+
+
+def _intersect(tool: BuildTool, labels: list[str], answer: str | None) -> list[str]:
+    """All intersections; for graphs that are not polynomials, those in the visible x-range."""
+    c = tool.c.document.construction
+    a, b = labels
+    try:
+        return c.execute(f"Intersect({a}, {b})")
+    except PKGError:
+        if not (_function(c, a) or _function(c, b)):
+            raise
+        f, g = (a, b) if _function(c, a) else (b, a)
+        lo, hi = _view_range(tool)
+        return c.execute(f"Intersect({f}, {g}, {lo}, {hi})")
+
+
 ANGLE_PROMPT = ("Angle (degrees; negative for clockwise)", "45°")
 
 PATTERNS: dict[str, tuple[list[Pattern], str | None]] = {
@@ -389,7 +434,10 @@ PATTERNS: dict[str, tuple[list[Pattern], str | None]] = {
     "locus": ([P("point path_point", _locus, ordered=False)], None),
     "midpoint": ([P("segment", _cmd("Midpoint", 1)), P("conic", _cmd("Midpoint", 1)),
                   P("point point", _cmd("Midpoint", 2))], "segment"),
-    "intersect": ([P("intersectable intersectable", _cmd("Intersect", 2))], None),
+    "intersect": ([P("intersectable intersectable", _intersect)], None),
+    "roots": ([P("function", _analysis("Root", "Roots"))], None),
+    "extremum": ([P("function", _analysis("Extremum", "Extremum"))], None),
+    "function_inspector": ([P("function", _inspect)], None),
     "regular_polygon": ([P("point point", _regular, ask=("Number of vertices", "4"))], "segment"),
     "circle_center_radius": ([P("point", run("Circle({0}, {ans})"), ask=("Radius", "2"))], None),
     "compass": ([P("segment point", run("Circle({1}, Length({0}))")),

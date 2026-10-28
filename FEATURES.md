@@ -10,7 +10,7 @@ Test names refer to files in `tests/`.
 - [x] App launches with `python -m pykaufgeo` (also `python -m pykaufgeo file.pkgeo`) (M0): test_gui_smoke::test_python_m_pykaufgeo_launches
 - [x] `.pkgeo` format: zip with JSON construction, view settings, styles, spreadsheet, CAS rows, PNG thumbnail (M1): test_pkgeo::test_round_trip_preserves_everything, test_file_layout_and_version. The spreadsheet and CAS sections are stored and round-tripped; their views arrive in M5/M6.
 - [x] `.pkgeo` format version and migration hook (M1): test_pkgeo::test_migration_hook, test_newer_and_unmigratable_versions
-- [x] `build.py` builds one-file `PyKaufGeo` executable with PyInstaller and prints the path (M0; polish in M9): rebuilt after M3 as `dist/PyKaufGeo.exe` (95.7 MB) on Windows 11; `--quit-after --smoke-report` run of the exe opened an 11-object M3 file (ellipse, point on it, locus, slider, rotated polygon, text, stored picture) and typeset a formula with mathtext (exit code 0)
+- [x] `build.py` builds one-file `PyKaufGeo` executable with PyInstaller and prints the path (M0; polish in M9): rebuilt after M4 as `dist/PyKaufGeo.exe` (103 MB with sympy) on Windows 11; `--demo m4 --quit-after --smoke-report` opened the M4 demo (12 objects, including a sympy derivative) and typeset a formula with mathtext (exit code 0)
 - [x] Milestone demos and gallery: `python -m pykaufgeo --demo [mN]` and Help > Milestone Demos open a ready-made construction per finished milestone; `tools/gallery.py` writes docs/GALLERY.md with their screenshots (test_demos)
 - [~] Build notes for Linux and macOS (M9): written in the build.py docstring; not tried on those systems
 - [ ] Export graphics: PNG (M8)
@@ -67,7 +67,7 @@ Test names refer to files in `tests/`.
 - [x] Assignments `A=(1,2)`, `f(x)=x^2`, `a=3`, `c: x^2+y^2=4`, `a := 3` (M1): test_parser::test_statements
 - [x] Lists `{1,2,3}` and matrices `{{1,2},{3,4}}` (M1): test_evaluator::test_lists_are_elementwise, test_matrices
 - [x] Equations (`x^2+y^2=4`, `y=2x+1`) (M1): test_evaluator::test_equations_classify
-- [~] Inequalities (`y>x^2`) as objects (M1 model, M4 drawing): test_evaluator::test_inequalities_and_curves
+- [x] Inequalities (`y>x^2`, combined with ∧ ∨ ¬) as objects and shaded regions: test_evaluator::test_inequalities_and_curves, test_m4_graphics::test_regions
 - [x] Points, polar points `(r; θ)`, vectors (lowercase label), 3D points (M1): test_evaluator::test_points_and_vectors, test_construction::test_vector_from_lowercase_tuple_label
 - [x] Complex numbers (`3+2i`) (M1): test_evaluator::test_complex_numbers
 - [x] Booleans, comparisons, logic operators (M1): test_evaluator::test_booleans_and_comparisons
@@ -99,8 +99,8 @@ Value model means the type is created, evaluated, saved and shown in the algebra
 - [x] Conic: ellipse, parabola, hyperbola, degenerate, general: value, drawing, commands; equations shown with whole-number coefficients where possible (test_m3_model::test_conic_constructions_print_whole_numbers, test_m3_ui::test_new_object_types_are_drawn, m3_main.png)
 - [x] Polygon: value model and drawing with fill and ink edge (m2_main.png); Polygon tools (test_m3_tools::test_polygon_tools)
 - [x] Function incl. piecewise and If: value model and drawing (test_evaluator::test_piecewise_if, test_render, m2_main.png)
-- [~] Parametric curve: value from `a(t) = (cos(t), sin(t))`; Curve command and drawing M4
-- [~] Implicit curve: value model; drawing M4
+- [x] Parametric curve: `a(t) = (cos(t), sin(t))` or Curve(x(t), y(t), t, a, b); polar via (r; θ); drawn adaptively; points on curves (test_m4_calculus::test_curves_implicit_curves_and_regions, test_m4_graphics::test_parametric_curves_are_smooth_and_split_at_jumps)
+- [x] Implicit curve: any equation in x and y that is not a line or conic, or ImplicitCurve(f); drawn by marching squares (test_m4_graphics::test_implicit_contour_lies_on_the_curve, m4_main.png)
 - [x] Locus: Locus(<point>, <point on object>) sampled adaptively and split at gaps (test_m3_model::test_locus_of_midpoint, test_m3_tools::test_locus_tool, m3_main.png)
 - [x] Arc and sector: Semicircle, CircularArc/Sector, CircumcircularArc/Sector (test_m3_model::test_arcs_sectors_and_their_intersections, m3_main.png)
 - [x] List (M1): test_evaluator::test_lists_are_elementwise, test_commands::test_list_results
@@ -111,7 +111,7 @@ Value model means the type is created, evaluated, saved and shown in the algebra
 - [ ] Checkbox (M8)
 - [ ] Input box (M8)
 - [x] Image: PNG/JPEG/GIF/BMP stored inside the .pkgeo file, positioned by its lower-left corner and width, draggable (test_m3_model::test_image_assets_and_abort, test_m3_tools::test_text_and_image_tools)
-- [~] Inequality region: value model; drawing M4
+- [x] Inequality region: shaded with correct overlaps; dashed boundary for strict inequalities (test_m4_graphics::test_regions, test_region_area_matches_the_disc, m4_regions.png)
 - [ ] Plane (M7)
 - [ ] Sphere (M7)
 - [ ] Surface (M7)
@@ -132,7 +132,7 @@ Value model means the type is created, evaluated, saved and shown in the algebra
 - [ ] Construction protocol (M8)
 - [~] Properties dialog: Basic (name, definition, caption, show object/label, label mode, fix, trace, auxiliary), Color (palette, opacity), Style (thickness, dash, point size/style, layer), Algebra (decimals), Position (texts, images), Slider (range, width, animation), Advanced (views, selection allowed, animation of points on objects); every change is an undo step for all selected objects (test_m3_ui::test_properties_dialog_applies_changes_as_undo_steps, test_properties_for_several_objects_and_sliders, m3_dialog_properties*.png). The Scripting tab arrives with scripting in M8
 - [x] Style bar per view: view bar (axes, grid, ratio lock, play/pause) and style bar for the selection (colour, line, point, label, properties) as icon buttons that fit any panel width and font size (test_m3_ui::test_edit_properties_menu_and_style_bar, m3_style_menu.png, m3_font_20pt.png)
-- [~] Toolbar with grouped tools and tooltips: all groups, icons, tooltips, group menus, keyboard navigation; all M2 and M3 tools work (test_graphics_view::test_implemented_tools_match_catalogue); Extremum, Roots, Function Inspector (M4) and Button, Checkbox, Input Box (M8) say "not implemented"
+- [~] Toolbar with grouped tools and tooltips: all groups, icons, tooltips, group menus, keyboard navigation; all M2, M3 and M4 tools work (test_graphics_view::test_implemented_tools_match_catalogue); Button, Checkbox, Input Box (M8) say "not implemented"
 - [~] Menus and keyboard shortcuts: File (New/Open/Save/Save As), Edit (Undo/Redo/Delete/Select All/Properties Ctrl+E), View (panels, Night, high contrast, Standard View, Show All), Options (font size, square points, preferences), Help (Command Help, About) work; right-click menu on objects (show, label, trace, animation, fix, rename, delete, properties: test_m3_ui::test_object_context_menu, m3_object_menu.png); export is greyed out until M8
 - [~] Preferences: font size, Night, high contrast and square points work (m0_dialog_preferences.png, m2_square_points.png); language takes effect in M8
 - [ ] Translations: English and Norwegian Bokmål (M8): `tr()` is in place, catalogue missing
@@ -170,8 +170,8 @@ All tool groups and tools are in the toolbar with icons and help text. Tools tha
 - [ ] Checkbox (M8)
 - [ ] Input Box (M8)
 - [x] Relation: message with equal / lies on / parallel / perpendicular / tangent / intersect facts (test_m3_tools::test_relation_tool_shows_a_message, test_m3_model::test_relation_texts)
-- [ ] Function Inspector (M4)
-- [~] Pen (stroke becomes a polyline) and Freehand Shape (recognises circles, segments, polygons) (test_m3_tools::test_pen_and_freehand); freehand function graphs arrive in M4
+- [x] Roots, Extremum (all of a polynomial, else in the visible x-range), Function Inspector (interval facts and a table of x, f, f', f'') (test_m4_graphics::test_roots_extremum_and_intersect_tools, test_function_inspector, m4_dialog_function_inspector*.png)
+- [x] Pen (stroke becomes a polyline) and Freehand Shape (recognises circles, segments, polygons, and function graphs as a fitted polynomial on the sketched x-range) (test_m3_tools::test_pen_and_freehand, test_m4_graphics::test_freehand_function_sketch)
 - [x] Delete (test_graphics_view::test_delete_tool_and_edit_delete)
 - [x] Show/Hide Object (hidden objects shown faintly while the tool is active), Show/Hide Label, Copy Visual Style (test_m3_tools::test_show_hide_label_and_copy_style_tools, m3_show_hide_tool.png)
 - [x] Escape cancels a half-finished tool action and removes what it created (test_m3_tools::test_escape_cancels_half_finished_action)
@@ -191,13 +191,13 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 - [x] GCD, LCM (M1): test_commands::test_number_results
 - [x] RandomBetween, RandomUniform, random() (M1): test_commands::test_random_commands_in_range, test_construction::test_random_numbers_are_stable_until_update_construction
 - [x] Min, Max, Mod, Div, abs (M1): test_commands, test_evaluator
-- [ ] PrimeFactors, IsPrime and similar (M4)
+- [x] PrimeFactors, IsPrime, Divisors, DivisorsList, DivisorsSum, NextPrime, PreviousPrime (M4): test_m4_calculus::test_primes_and_divisors
 
 ### Geometry
 - [x] Distance (M1): test_commands::test_distance
 - [x] Midpoint, Center (M1): test_commands::test_midpoint_and_center
 - [x] Intersect for lines, segments, rays, line/conic, circle/circle (M1): test_commands::test_intersections
-- [~] Intersect for conic/conic and line/arc (test_m3_model::test_arcs_sectors_and_their_intersections); functions and curves in M4
+- [~] Intersect for conic/conic, line/arc, and function graphs with lines, conics and functions (all for polynomials, else from a start point or in an interval) (test_m3_model::test_arcs_sectors_and_their_intersections, test_m4_calculus::test_intersections_with_function_graphs); parametric and implicit curves not yet
 - [x] Line (M1): test_commands::test_lines
 - [x] Segment (M1): test_commands::test_lines
 - [x] Ray (M1): test_commands::test_lines
@@ -205,7 +205,7 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 - [x] Circle (M1): test_commands::test_circles
 - [x] Ellipse, Hyperbola, Parabola, Conic, Vertex, Polar, Diameter, Semicircle, CircularArc/Sector, CircumcircularArc/Sector (test_m3_model::test_conic_constructions_print_whole_numbers, test_vertices_tangents_polar, test_arcs_sectors_and_their_intersections)
 - [x] Polygon, Polyline (M1): test_commands::test_polygons_area_perimeter
-- [x] Rotate, Reflect (point, line, circle inversion), Translate, Dilate on points, lines, conics, polygons, arcs, loci, lists; functions by translation (test_m3_model::test_transform_points_and_shapes, test_transform_conic_and_function)
+- [x] Rotate, Reflect (point, line, circle inversion), Translate, Dilate on points, lines, conics, polygons, arcs, loci, lists, curves, implicit curves and regions; functions are translated, or become curves under other maps (test_m3_model::test_transform_points_and_shapes, test_transform_conic_and_function, test_m4_calculus::test_transforming_graphs_gives_curves)
 - [x] Tangent (point/conic, line/circle, x-value or point/function), AngleBisector, FitLine, Polygon(A, B, n), Segment(A, length), Point(<object>) (test_m3_model::test_vertices_tangents_polar, test_point_on_object_keeps_its_place)
 - [x] Locus, Relation (test_m3_model::test_locus_of_midpoint, test_relation_texts)
 - [x] Angle (three points, vectors, lines, number; polygon interior angles in M3) (M1): test_commands::test_angles
@@ -214,21 +214,21 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 - [x] PerpendicularLine, PerpendicularBisector (M1): test_commands::test_lines
 
 ### Functions and calculus (M4)
-- [ ] Derivative (incl. `f'`): `f'` is parsed and reports "arrives in M4"
-- [ ] Integral, IntegralBetween
-- [ ] Limit
-- [ ] Root, Roots
-- [ ] Extremum, TurningPoint, InflectionPoint
-- [ ] Asymptote
-- [ ] Taylor (TaylorPolynomial)
-- [ ] Curvature
-- [ ] Newton (root by Newton's method)
-- [ ] NSolve
-- [ ] SolveODE
-- [ ] Polynomial
+- [x] Derivative, also `f'`, `f''(x)`, partial derivatives and curves (symbolic, sympy): test_m4_calculus::test_derivatives_and_prime_notation, test_derivative_values, test_sympy_agrees_numerically
+- [x] Integral (antiderivative, or the definite integral shaded in the view), IntegralBetween, NIntegral: test_m4_calculus::test_antiderivative_differentiates_back, test_definite_integrals_are_shaded_numbers
+- [x] Limit, LimitAbove, LimitBelow (also at ±∞): test_m4_calculus::test_limits
+- [x] Root (all roots of a polynomial, from a start value, in an interval), Roots: test_m4_calculus::test_roots_extrema_inflections
+- [x] Extremum, InflectionPoint (alias TurningPoint): test_m4_calculus::test_roots_extrema_inflections
+- [x] Asymptote (functions: vertical, horizontal, oblique; hyperbolas): test_m4_calculus::test_asymptotes
+- [x] TaylorPolynomial (aliases TaylorSeries, Taylor): test_m4_calculus::test_taylor_polynomial
+- [x] Curvature, OsculatingCircle: test_m4_calculus::test_curvature_and_osculating_circle
+- [x] Newton's method: Root(f, <start>) and NSolve(..., x = <start>) (test_m4_calculus::test_roots_extrema_inflections, test_nsolve)
+- [x] NSolve (alias NSolutions): test_m4_calculus::test_nsolve
+- [x] SolveODE (y' = f(x, y), numeric, as a curve of points): test_m4_calculus::test_solve_ode_matches_the_exact_solution
+- [x] Polynomial (expand, or through points), FitPoly, Function(f, a, b): test_m4_calculus::test_polynomials_and_fits
 - [x] If, piecewise functions (M1): test_evaluator::test_piecewise_if
-- [ ] Curve
-- [ ] ImplicitCurve
+- [x] Curve: test_m4_calculus::test_curves_implicit_curves_and_regions
+- [x] ImplicitCurve: test_m4_calculus::test_curves_implicit_curves_and_regions
 
 ### CAS (M5)
 - [ ] Solve, Solutions
@@ -244,7 +244,7 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 ### Statistics (M6)
 - [ ] Mean, Median, SD, Variance, Quartiles
 - [ ] Correlation, Covariance
-- [~] FitLine (M3, least squares: test_m3_tools::test_list_and_best_fit_rectangles); FitPoly, FitExp, FitLog, FitPow, FitSin
+- [~] FitLine (M3, test_m3_tools::test_list_and_best_fit_rectangles) and FitPoly (M4, test_m4_calculus::test_polynomials_and_fits); FitExp, FitLog, FitPow, FitSin
 - [ ] Histogram, BoxPlot, BarChart, DotPlot
 - [ ] Normal, Binomial, Poisson, Student, ChiSquared, F, Exponential, Uniform (PDF, CDF, inverse)
 - [ ] ZMeanTest, TMeanTest, ZMeanEstimate, TMeanEstimate and related
@@ -279,9 +279,10 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 ## 2D rendering (M2-M4)
 
 - [x] Adaptive function sampling with discontinuity/asymptote detection (test_render: tan, 1/x, floor, sqrt, ln, steep and wiggly curves)
-- [ ] Implicit curves by marching squares with refinement
-- [ ] Inequality regions with correct overlaps
-- [ ] Parametric and polar curves with adaptive step
+- [~] Implicit curves by marching squares (3 px cells, linear interpolation, saddle cells by the centre value, poles rejected, segments joined into polylines): test_m4_graphics::test_implicit_contour_lies_on_the_curve, test_implicit_contour_skips_poles; no adaptive refinement below the cell size yet
+- [x] Inequality regions with correct overlaps (margin field; ∧ ∨ ¬ combine; dashed boundary when strict): test_m4_graphics::test_regions, m4_regions.png
+- [x] Parametric and polar curves with adaptive step (steps halved until under 3 px; jumps split the curve): test_m4_graphics::test_parametric_curves_are_smooth_and_split_at_jumps
+- [x] Shaded definite integrals and lists of lines and curves (Asymptote): test_m4_graphics::test_new_objects_are_drawn
 - [x] Pixel-accurate hit testing and selection (test_graphics_view::test_function_with_poles_and_hit_testing)
 - [x] Constrained dragging (point on object stays on object, keeps its place when the object moves) (test_m3_model::test_point_on_object_keeps_its_place, test_m3_tools::test_move_tool_drags_dependent_objects_and_path_points)
 - [x] Locus and trace rendering; traces stay until the view moves or Clear Traces (test_m3_ui::test_trace_leaves_a_copy_behind)
@@ -299,7 +300,7 @@ Predefined functions (`sin`, `ln`, `sqrt`, `floor`, `round`, `gamma`, `erf`, `re
 - [x] Tests: parser incl. odd inputs (M1): test_parser
 - [x] Tests: dependency order (M1): test_construction
 - [~] Tests: geometric commands against known results: every implemented geometry command (test_commands, test_m3_model); grows per milestone
-- [ ] Tests: calculus and CAS against sympy (M4, M5)
+- [~] Tests: calculus against known results and numeric differentiation (M4, test_m4_calculus); CAS in M5
 - [x] Tests: save/load round trips (M1): test_pkgeo
 - [x] Tests: undo/redo invariants (M1): test_undo
 - [x] Tests: theme token check (M0): test_theme_tokens

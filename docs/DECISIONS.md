@@ -312,3 +312,48 @@ honest: a milestone marked done in PLAN.md needs a demo, and the gallery must be
 Writing the demos showed that message blocks ignored their padding (the stylesheet
 applies the box model only at the first polish), clipping the first letter and long
 texts; message blocks now get their kind before the first polish and grow to fit.
+
+## M4
+
+**D-401 sympy for symbolic calculus.** Derivatives, antiderivatives, limits, Taylor
+polynomials, asymptotes and polynomial expansion go through sympy (already the CAS
+library of the plan) via `engine/sym_bridge.py`. Numbers typed as integers become exact
+integers; other floats stay floats (as in GeoGebra's Algebra view); the folded
+constants e and π are recognised and kept exact. Results are tidied: polynomials
+expanded in descending powers, rational functions as one fraction, minus signs on
+the leading factor. Every call runs with a 4 s limit (the worker is abandoned if it
+overruns) and results are cached by expression.
+
+**D-402 Prime notation.** `f'` is resolved to `Derivative(f)` (`f''` to
+`Derivative(f, 2)`) when f is a function, and written back as `f'`, so definitions such
+as `g(x) = f'(x) + 1` round-trip. An unnamed derivative of f is called f' if free.
+
+**D-403 Several results and their indices.** Commands with several results create one
+object per result whose definition is the command with an index. Commands choose the
+indexed form (`Command.indexed`): `Root(f)` expands to `Roots(f, 1)`, ... because
+`Root(f, x0)` already means "the root near x0". Polynomials get all their roots and
+extrema; other functions need an interval or a start value, and the tools use the
+visible x-range.
+
+**D-404 Definite integrals are shaded numbers.** `Integral(f, a, b)` is a number that
+remembers f, a, b (an `AreaValue`), shown by default as the shaded area; the same for
+IntegralBetween. NIntegral is the plain number.
+
+**D-405 Implicit curves by marching squares.** F(x, y) = 0 is contoured on 3 px cells
+with linear interpolation, saddles resolved by the cell centre. A sign change through
+a pole is rejected when |F| at the segment's midpoint is not small compared with F
+one cell to either side. Segments are chained into polylines (dash patterns would
+otherwise restart every 3 px).
+
+**D-406 Regions as a margin field.** A condition becomes one expression M(x, y), positive
+inside: a < b gives b - a, ∧ the minimum, ∨ the maximum, ¬ the negation. The fill is
+the grid mask M > 0 drawn as a smoothed image; the boundary is the contour M = 0, which
+stays smooth where conditions overlap. All-strict conditions get a dashed boundary.
+
+**D-407 Graph transformations.** Translating a function keeps a function; any other map
+turns its graph into the curve (t, f(t)), t in [-100, 100]. Implicit curves and regions
+are mapped by substituting the inverse map into their equation.
+
+**D-408 Freehand functions.** A sketch that goes left to right (95 % of its steps) becomes
+`Function(<polynomial>, x0, x1)` with the lowest degree up to 6 that follows the
+stroke within 3 px. There are no table-based freehand functions.

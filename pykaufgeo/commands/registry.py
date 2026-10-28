@@ -31,6 +31,7 @@ from pykaufgeo.core.values import (
     Angle,
     Circle,
     Conic,
+    CurveValue,
     FunctionValue,
     Line,
     ListValue,
@@ -46,7 +47,7 @@ from pykaufgeo.core.values import (
     is_real,
 )
 from pykaufgeo.engine.symbolic import Sym, to_node
-from pykaufgeo.parser.ast import Call, Ident, Node
+from pykaufgeo.parser.ast import Call, Ident, Node, Num
 
 if TYPE_CHECKING:
     from pykaufgeo.engine.context import CallContext
@@ -99,6 +100,7 @@ ARG_TYPES: dict[str, tuple[Callable[[Any], Any], frozenset[GeoType]]] = {
     "Conic": (_isa(Circle, Conic), frozenset({GeoType.CIRCLE, GeoType.CONIC})),
     "Polygon": (_isa(Polygon), frozenset({GeoType.POLYGON})),
     "Function": (_isa(FunctionValue), frozenset({GeoType.FUNCTION, GeoType.FUNCTION_NVAR})),
+    "Curve": (_isa(CurveValue), frozenset({GeoType.CURVE})),
     "List": (_isa(ListValue), frozenset({GeoType.LIST, GeoType.MATRIX})),
     "Matrix": (lambda v: v if isinstance(v, ListValue) and v.is_matrix else NO_MATCH, frozenset({GeoType.MATRIX})),
     "Object": (lambda v: v, frozenset(GeoType)),
@@ -192,6 +194,10 @@ class Command:
         return var_pos, lazy_pos
 
     # -- dispatch ----------------------------------------------------------------
+    def indexed(self, args: tuple[Node, ...], k: int) -> Call:
+        """Definition of the k-th result of a command with several results (index appended)."""
+        return Call(self.name, args + (Num(float(k), str(k)),))
+
     def dispatch(self, nodes: tuple[Node, ...], call: "CallContext") -> Any:
         n = len(nodes)
         candidates = [s for s in self.signatures if s.accepts_count(n)]
@@ -221,7 +227,7 @@ class Command:
                 if i not in cache:
                     cache[i] = call.eval(node)
                 v = cache[i]
-                if isinstance(v, Sym) and spec.type == "Function":
+                if isinstance(v, Sym) and (spec.type == "Function" or (spec.type == "Object" and not self.pointwise)):
                     v = call.finalize(v)  # an expression in x is accepted where a function is expected
                 if isinstance(v, Undef):
                     if v.kind is None or v.kind in ARG_TYPES[spec.type][1]:

@@ -136,7 +136,7 @@ build.py               PyInstaller one-file build
 | M1 | Core model, DAG, parser, evaluator, command registry (core subset), undo/redo, save/load | done |
 | M2 | 2D graphics view, input bar, algebra view | done |
 | M3 | Full tool set, transformations, conics, polygons, locus, sliders, animation, styling, properties | done |
-| M4 | Calculus/analysis commands, implicit and parametric curves, inequalities | not started |
+| M4 | Calculus/analysis commands, implicit and parametric curves, inequalities | done |
 | M5 | CAS view | not started |
 | M6 | Spreadsheet, statistics, regression, probability calculator | not started |
 | M7 | 3D view | not started |
@@ -253,3 +253,30 @@ a milestone is marked done without a demo or if docs/GALLERY.md is stale.
   (M8); LaTeX texts in the Graphics view (M8).
 * Next: M4 (calculus and analysis commands, implicit and parametric curves,
   inequality regions, function tools).
+
+### M4: calculus, curves, regions (2026-10-28)
+
+* Symbolic calculus through sympy (`engine/sym_bridge.py`): Derivative (also `f'`,
+  `f''(x)`, partial, of curves), antiderivatives, limits (also one-sided and at ±∞),
+  Taylor polynomials, asymptotes, Polynomial. Results read naturally (`3x² - 3`,
+  `(1 - x²) / (x² + 1)²`, `e^(2x)`); e and π stay exact; every symbolic computation has
+  a 4 s limit; sympy is imported in the background at start-up.
+* Numeric analysis (`engine/analysis.py`): roots, extrema and inflection points
+  (exact for polynomials, interval search otherwise), Newton from a start value,
+  definite integrals (shaded in the view), IntegralBetween, NIntegral, NSolve, SolveODE,
+  Curvature, OsculatingCircle, FitPoly, Function(f, a, b); intersections of graphs with
+  lines, conics and graphs; PrimeFactors, IsPrime and divisor commands.
+* Rendering (`render/curves.py`, `implicit.py`, `regions.py`): adaptive parametric and
+  polar curves, implicit curves by marching squares (poles rejected, segments joined
+  into polylines so dashes work), inequality regions as a margin field (overlaps,
+  ∧ ∨ ¬, dashed boundary when strict), shaded integrals, lists of lines and curves.
+* Transformations of graphs give curves; implicit curves and regions are transformed
+  by substitution. Points can sit on parametric curves.
+* Tools: Roots, Extremum, Function Inspector; Freehand Shape recognises function
+  graphs; clicking where two graphs cross makes their intersection.
+* Design review fixes: dashed region boundaries drawn solid (thousands of 3 px pieces
+  restart the dash pattern; now chained), cluttered demo, an unclear inspector message.
+* Test suite: 513 tests in about 40 s (`test_m4_calculus`, `test_m4_graphics`).
+* Not done: intersections with parametric or implicit curves; adaptive refinement of
+  implicit curves below the 3 px cell; the CAS view (M5).
+* Next: M5 (CAS view).

@@ -424,6 +424,85 @@ def m3_jobs(out: Path) -> dict:
     }
 
 
+M4_INPUT = (
+    "f(x) = x^3 / 4 - x", "f'", "Root(f)", "Extremum(f)", "I = Integral(f, -2, 0)", "T = TaylorPolynomial(cos(x), 0, 4)",
+    "ic = ImplicitCurve(x^3 + y^3 - 6x y)", "k = Curve(2cos(t) + 6, 2sin(3t) - 4, t, 0, 2π)",
+    "l = Asymptote((x^2 + 1) / (x - 4))", "d = Limit(sin(x) / x, 0)", "n = NSolve(cos(x) = x)",
+)
+REGION_INPUT = ("r_1: x^2 + y^2 < 16", "r_2: y > x^2 - 3", "r_3: y < sin(2x) - 1 || x > 5", "s: x + y >= 1 && x - y <= 2")
+
+
+def m4_document(lines=M4_INPUT):
+    from pykaufgeo.core.document import Document
+
+    doc = Document(seed=1)
+    for line in lines:
+        doc.execute(line)
+    if "r_1" in doc.construction:
+        doc.construction.set_style("r_2", color="red")
+        doc.construction.set_style("r_3", color="magenta")
+        doc.construction.set_style("s", color="green")
+    doc.undo.reset()
+    return doc
+
+
+def m4_main(out: Path, name: str, prefs: Preferences | None = None, lines=M4_INPUT,
+            window=(-8.0, -6.0, 9.0, 6.0), setup: Callable | None = None) -> Path:
+    def full_setup(app, win):
+        win.selection.set(["f"] if "f" in win.document.construction else [])
+        settle(app)
+        canvas = win.graphics.canvas
+        canvas.grab()
+        canvas.set_viewport(canvas.vp.zoomed_to(*window, keep_ratio=True))
+        settle(app)
+        if setup is not None:
+            setup(app, win)
+            settle(app)
+    return shot_main(out, name, prefs, (), full_setup, m4_document(lines))
+
+
+def m4_jobs(out: Path) -> dict:
+    def sketch(app, win):
+        from PySide6.QtCore import QPointF
+
+        win.toolbar.select_tool("freehand")
+        canvas = win.graphics.canvas
+        canvas.tool.stroke = [QPointF(canvas.vp.sx(x / 10), canvas.vp.sy(-4 + 0.15 * (x / 10) ** 2))
+                              for x in range(-60, 61, 3)]
+        canvas.update()
+
+    return {
+        "m4_main": lambda: m4_main(out, "m4_main"),
+        "m4_night": lambda: m4_main(out, "m4_night", Preferences(night=True)),
+        "m4_contrast": lambda: m4_main(out, "m4_high_contrast", Preferences(high_contrast=True)),
+        "m4_font": lambda: m4_main(out, "m4_font_20pt", Preferences(font_size=20)),
+        "m4_regions": lambda: m4_main(out, "m4_regions", lines=REGION_INPUT, window=(-7.0, -6.0, 7.0, 6.0)),
+        "m4_regions_night": lambda: m4_main(out, "m4_regions_night", Preferences(night=True), lines=REGION_INPUT,
+                                            window=(-7.0, -6.0, 7.0, 6.0)),
+        "m4_sketch": lambda: m4_main(out, "m4_freehand_sketch", setup=sketch),
+        "m4_inspector": lambda: m4_dialog(out, "m4_dialog_function_inspector", 0),
+        "m4_inspector_points": lambda: m4_dialog(out, "m4_dialog_function_inspector_points", 1),
+    }
+
+
+def m4_dialog(out: Path, name: str, tab: int) -> Path:
+    from pykaufgeo.gui.function_inspector import FunctionInspector
+
+    app, win = make_window(None, m4_document())
+    dlg = FunctionInspector(win.document, "f", -2, 2, win)
+    dlg.show()
+    settle(app)
+    dlg.tabs.setCurrentIndex(tab)
+    settle(app)
+    pos = QPoint((win.width() - dlg.width()) // 2, (win.height() - dlg.height()) // 4)
+    path = out / f"{name}.png"
+    compose(win.grab(), [(dlg, pos)]).save(str(path))
+    win.document.modified = False
+    dlg.close()
+    win.close()
+    return path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT / "docs" / "screenshots"))
@@ -460,6 +539,7 @@ def main() -> int:
     }
     jobs.update(m2_jobs(out))
     jobs.update(m3_jobs(out))
+    jobs.update(m4_jobs(out))
     names = args.only or list(jobs)
     for n in names:
         path = jobs[n]()

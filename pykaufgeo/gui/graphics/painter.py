@@ -199,6 +199,8 @@ def paint_drawables(p: QPainter, drawables: list[Drawable], selected: set[str], 
             _image(p, d)
         elif d.kind == "slider":
             _slider(p, d, sel)
+        elif d.kind == "region":
+            _region(p, d, sel)
         else:
             _shape(p, d, sel)
         if d.ghost:
@@ -218,7 +220,7 @@ def _halo(p: QPainter, d: Drawable, colors: theme.ThemeColors, strong: bool) -> 
     """Yellow halo with a black outline (selection); a thin halo for hover."""
     edge, halo = QColor(colors.focus_edge), QColor(colors.selection_bg)
     extra = theme.HALO_WIDTH if strong else theme.HALO_WIDTH / 2
-    if d.rect is not None:
+    if d.rect is not None and d.kind in ("text", "image"):
         pad = theme.TEXT_PAD + extra / 2
         r = d.rect.adjusted(-pad, -pad, pad, pad)
         p.setPen(_pen(edge, theme.HALO_EDGE))
@@ -291,6 +293,19 @@ def _text(p: QPainter, d: Drawable) -> None:
         p.drawText(QRectF(d.rect.left(), y, d.rect.width() + fm.averageCharWidth(), fm.height()),
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, line)
         y += fm.height()
+
+
+def _region(p: QPainter, d: Drawable, selected: bool) -> None:
+    """Inequality: the filled area (a grid image, smoothed), then its boundary."""
+    if d.pixmap is not None and d.rect is not None:
+        p.save()
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        p.drawPixmap(d.rect, d.pixmap, QRectF(d.pixmap.rect()))
+        p.restore()
+    if d.path is not None:
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(_pen(d.color, d.width + (theme.SELECTION_EXTRA if selected else 0), d.dash))
+        p.drawPath(d.path)
 
 
 def _image(p: QPainter, d: Drawable) -> None:

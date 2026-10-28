@@ -195,6 +195,7 @@ OBJECT_COLORS: dict[str, str] = {
     "angle": "green",
     "locus": "magenta",
     "inequality": "blue",
+    "integral": "blue",
     "text": "ink",
     "number": "ink",
     "boolean": "ink",

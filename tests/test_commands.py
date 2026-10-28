@@ -87,7 +87,7 @@ def test_intersections() -> None:
     # conic / conic: x² = 2.5, y² = 1.5
     p = ev("Intersect(x^2 - y^2 = 1, x^2 + y^2 = 4, 1)")
     assert abs(abs(p.x) - math.sqrt(2.5)) < 1e-9 and abs(abs(p.y) - math.sqrt(1.5)) < 1e-9
-    with pytest.raises(PKGError, match="M4"):
+    with pytest.raises(PKGError, match="not supported yet"):
         ev("Intersect(x^2 - y^2 = 1, x^3 + y^3 = 1)")
 
 

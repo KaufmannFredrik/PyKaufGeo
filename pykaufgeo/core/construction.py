@@ -30,13 +30,26 @@ from pykaufgeo.core.graph import descendants, find_path, stable_topo_sort
 from pykaufgeo.core.labels import next_label, validate_label
 from pykaufgeo.core.style import Style
 from pykaufgeo.core.types import GeoType
+from pykaufgeo import theme
 from pykaufgeo.core.values import (
     Angle,
+    ArcValue,
+    AreaValue,
+    Circle,
+    Conic,
+    CurveValue,
     FunctionValue,
+    ImplicitValue,
+    Line,
     ListValue,
+    LocusValue,
     MultiOutput,
     Point,
     Point3D,
+    Polygon,
+    Polyline,
+    Ray,
+    Segment,
     Undef,
     Vector,
     Vector3D,
@@ -190,9 +203,20 @@ class Construction:
             self._validate_label(label)
         self._validate_params(params)
         expr, deps = Resolver(self._types()).resolve(stmt.expr, params or ())
+        if label is None:
+            label = self._derivative_label(expr)
         if isinstance(expr, Call) and expr.name == "Slider" and not deps and not params:
             return self._add_slider(label, expr, style, caption)
         return self._add_resolved(label, expr, deps, params, type_hint, style, state, caption, scripts, extras)
+
+    def _derivative_label(self, expr: Node) -> str | None:
+        """``f'`` typed on its own is named f' (as in GeoGebra), if that name is free."""
+        from pykaufgeo.engine.resolver import prime_name
+
+        if isinstance(expr, Apply) and all(isinstance(a, Ident) and a.name in ("x", "y") for a in expr.args):
+            expr = expr.func
+        name = prime_name(expr)
+        return name if name is not None and name not in self._el else None
 
     def _add_slider(self, label: str | None, expr: Call, style: Style | None, caption: str) -> list[str]:
         """``a = Slider(0, 10, 1)``: a free number with a slider (range kept in extras)."""
@@ -225,7 +249,7 @@ class Construction:
                 raise EvalError("A command with several results must stand alone in the input.")
             labels: list[str] = []
             for k in range(1, len(value.values) + 1):
-                sub = Call(expr.name, expr.args + (Num(float(k), str(k)),))
+                sub = get_command(expr.name).indexed(expr.args, k)
                 labels += self._add_resolved(label if k == 1 else None, sub, deps, None, type_hint,
                                              style.copy() if style else None, None, caption if k == 1 else "",
                                              None)
@@ -236,7 +260,7 @@ class Construction:
             label = next_label(kind, lambda n: n in self._el or n in CONSTANTS)
         free = self._is_free(expr, deps)
         el = GeoElement(label, expr, params, frozenset(deps), value, kind,
-                        style or Style.default_for(kind, free), free, caption, state, None, dict(scripts or {}),
+                        style or default_style(kind, free, value), free, caption, state, None, dict(scripts or {}),
                         dict(extras or {}))
         self._insert(el)
         self.bus.emit(ElementsAdded((label,)))
@@ -623,6 +647,23 @@ class Construction:
         stmt = Statement(parse_expression(definition), label, tuple(params) if params else None, "assign")
         self.add_statement(stmt, type_hint=hint, style=style, state=state, caption=caption, scripts=scripts,
                            extras=extras)
+
+
+GEOMETRIC_ITEMS = (Point, Line, Segment, Ray, Circle, Conic, Polygon, Polyline, ArcValue, FunctionValue, CurveValue,
+                   ImplicitValue, LocusValue, Vector)
+
+
+def default_style(kind: GeoType, free: bool, value: Any) -> Style:
+    """Style of a new object: by type, except that shaded integrals and lists of
+    geometric objects (points, lines, curves, ...) are shown in the Graphics view."""
+    st = Style.default_for(kind, free)
+    if isinstance(value, AreaValue):
+        st.visible_in = frozenset({"g1"})
+        st.color = theme.object_color_token("integral")
+        st.label_visible = False
+    elif isinstance(value, ListValue) and value.items and all(isinstance(i, GEOMETRIC_ITEMS) for i in value.items):
+        st.visible_in = frozenset({"g1"})
+    return st
 
 
 def value_to_node(value: Any) -> tuple[Node, tuple[str, ...] | None]:

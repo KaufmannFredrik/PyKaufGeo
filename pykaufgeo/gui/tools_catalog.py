@@ -27,7 +27,7 @@ class ToolGroup:
 
 
 # Milestones whose tools all work; every other tool says "not implemented yet" when chosen.
-DONE_MILESTONES = frozenset({"M2", "M3"})
+DONE_MILESTONES = frozenset({"M2", "M3", "M4"})
 
 
 def _t(id_: str, name: str, help_: str, milestone: str) -> ToolSpec:
@@ -38,7 +38,7 @@ TOOL_GROUPS: tuple[ToolGroup, ...] = (
     ToolGroup("move", "Move", (
         _t("move", "Move", "Drag or select objects", "M2"),
         _t("pen", "Pen", "Write or sketch in the Graphics View", "M3"),
-        _t("freehand", "Freehand Shape", "Sketch a function or geometric object", "M3"),
+        _t("freehand", "Freehand Shape", "Sketch a function graph, circle, segment or polygon", "M3"),
     )),
     ToolGroup("point", "Point", (
         _t("point", "Point", "Click on the Graphics View, an object or an intersection", "M2"),

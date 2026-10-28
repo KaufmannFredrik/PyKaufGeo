@@ -1,4 +1,4 @@
-"""Numbers and algebra: GCD, LCM, Min, Max, Mod, Div, random numbers."""
+"""Numbers and algebra: GCD, LCM, Min, Max, Mod, Div, random numbers, primes and divisors."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import math
 from functools import reduce
 
 from pykaufgeo.commands.registry import Command, register, sig
+from pykaufgeo.core.errors import CommandError
 from pykaufgeo.core.types import GeoType
 from pykaufgeo.core.values import ListValue, Undef, is_real
 
@@ -158,3 +159,121 @@ class Random(Command):
     @sig(returns=N)
     def unit(self, call) -> float:
         return float(call.random(lambda rng: rng.random()))
+
+
+# ----------------------------------------------------------------------- whole numbers
+
+MAX_FACTOR = 10 ** 15  # trial division up to sqrt(10^15) stays fast
+
+
+def _whole(n: int, what: str, low: int = 1) -> int:
+    if not low <= n <= MAX_FACTOR:
+        raise CommandError(f"{what} works for whole numbers from {low} to 10^15.")
+    return n
+
+
+def prime_factors(n: int) -> list[int]:
+    out, p = [], 2
+    while p * p <= n:
+        while n % p == 0:
+            out.append(p)
+            n //= p
+        p += 1 if p == 2 else 2
+    if n > 1:
+        out.append(n)
+    return out
+
+
+def is_prime(n: int) -> bool:
+    return n >= 2 and prime_factors(n) == [n]
+
+
+def divisors(n: int) -> list[int]:
+    small = [d for d in range(1, math.isqrt(n) + 1) if n % d == 0]
+    return sorted(set(small + [n // d for d in small]))
+
+
+@register
+class PrimeFactors(Command):
+    category = CAT
+    description = "Prime factors of a whole number, with repetition."
+    examples = ("PrimeFactors(360)  ->  {2, 2, 2, 3, 3, 5}",)
+
+    @sig("<Integer>", returns=GeoType.LIST)
+    def of(self, call, n: int) -> ListValue:
+        return ListValue(tuple(float(p) for p in prime_factors(_whole(n, "PrimeFactors", 2))))
+
+
+@register
+class IsPrime(Command):
+    category = CAT
+    description = "true if the whole number is a prime."
+    examples = ("IsPrime(97)  ->  true",)
+
+    @sig("<Integer>", returns=GeoType.BOOLEAN)
+    def of(self, call, n: int) -> bool:
+        return n >= 2 and is_prime(_whole(n, "IsPrime", 2))
+
+
+@register
+class Divisors(Command):
+    category = CAT
+    description = "Number of divisors of a whole number."
+    examples = ("Divisors(12)  ->  6",)
+
+    @sig("<Integer>", returns=N)
+    def count(self, call, n: int) -> float:
+        return float(len(divisors(_whole(n, "Divisors"))))
+
+
+@register
+class DivisorsList(Command):
+    category = CAT
+    description = "All divisors of a whole number."
+    examples = ("DivisorsList(12)  ->  {1, 2, 3, 4, 6, 12}",)
+
+    @sig("<Integer>", returns=GeoType.LIST)
+    def all(self, call, n: int) -> ListValue:
+        return ListValue(tuple(float(d) for d in divisors(_whole(n, "DivisorsList"))))
+
+
+@register
+class DivisorsSum(Command):
+    category = CAT
+    description = "Sum of all divisors of a whole number."
+    examples = ("DivisorsSum(12)  ->  28",)
+
+    @sig("<Integer>", returns=N)
+    def total(self, call, n: int) -> float:
+        return float(sum(divisors(_whole(n, "DivisorsSum"))))
+
+
+@register
+class NextPrime(Command):
+    category = CAT
+    description = "The smallest prime greater than the number."
+    examples = ("NextPrime(10)  ->  11",)
+
+    @sig("<Number>", returns=N)
+    def after(self, call, x: float) -> float:
+        n = max(2, math.floor(x) + 1)
+        _whole(n, "NextPrime")
+        while not is_prime(n):
+            n += 1
+        return float(n)
+
+
+@register
+class PreviousPrime(Command):
+    category = CAT
+    description = "The largest prime smaller than the number (undefined below 3)."
+    examples = ("PreviousPrime(10)  ->  7",)
+
+    @sig("<Number>", returns=N)
+    def before(self, call, x: float) -> float | Undef:
+        n = math.ceil(x) - 1
+        while n >= 2:
+            if is_prime(_whole(n, "PreviousPrime")):
+                return float(n)
+            n -= 1
+        return Undef(GeoType.NUMBER)

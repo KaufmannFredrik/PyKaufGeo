@@ -12,11 +12,12 @@ against the type in brackets.
 
 * **Action Objects**: [Slider](#slider)
 * **Conics**: [CircularArc](#circulararc), [CircularSector](#circularsector), [CircumcircularArc](#circumcirculararc), [CircumcircularSector](#circumcircularsector), [Conic](#conic), [Diameter](#diameter), [Ellipse](#ellipse), [Hyperbola](#hyperbola), [Parabola](#parabola), [Polar](#polar), [Semicircle](#semicircle), [Tangent](#tangent)
+* **Functions & Calculus**: [Asymptote](#asymptote), [Curvature](#curvature), [Curve](#curve), [Derivative](#derivative), [Extremum](#extremum), [FitPoly](#fitpoly), [Function](#function), [ImplicitCurve](#implicitcurve), [InflectionPoint](#inflectionpoint), [Integral](#integral), [IntegralBetween](#integralbetween), [Limit](#limit), [LimitAbove](#limitabove), [LimitBelow](#limitbelow), [NIntegral](#nintegral), [NSolve](#nsolve), [OsculatingCircle](#osculatingcircle), [Polynomial](#polynomial), [Root](#root), [Roots](#roots), [SolveODE](#solveode), [TaylorPolynomial](#taylorpolynomial)
 * **Geometry**: [Angle](#angle), [AngleBisector](#anglebisector), [Area](#area), [Center](#center), [Circle](#circle), [Circumference](#circumference), [Distance](#distance), [Intersect](#intersect), [Line](#line), [Locus](#locus), [Midpoint](#midpoint), [Perimeter](#perimeter), [PerpendicularBisector](#perpendicularbisector), [PerpendicularLine](#perpendicularline), [Point](#point), [Polygon](#polygon), [Polyline](#polyline), [Ray](#ray), [Relation](#relation), [Segment](#segment), [Slope](#slope), [Vector](#vector), [Vertex](#vertex)
 * **Lists**: [Append](#append), [CountIf](#countif), [Element](#element), [Filter](#filter), [First](#first), [Flatten](#flatten), [Iteration](#iteration), [IterationList](#iterationlist), [Join](#join), [KeepIf](#keepif), [Last](#last), [Length](#length), [Product](#product), [Reverse](#reverse), [Sequence](#sequence), [Sort](#sort), [Sum](#sum), [Take](#take), [Unique](#unique), [Zip](#zip)
 * **Logic**: [If](#if)
 * **Matrices**: [Determinant](#determinant), [Invert](#invert), [Transpose](#transpose)
-* **Numbers and algebra**: [Div](#div), [GCD](#gcd), [LCM](#lcm), [Max](#max), [Min](#min), [Mod](#mod), [Random](#random), [RandomBetween](#randombetween), [RandomUniform](#randomuniform)
+* **Numbers and algebra**: [Div](#div), [Divisors](#divisors), [DivisorsList](#divisorslist), [DivisorsSum](#divisorssum), [GCD](#gcd), [IsPrime](#isprime), [LCM](#lcm), [Max](#max), [Min](#min), [Mod](#mod), [NextPrime](#nextprime), [PreviousPrime](#previousprime), [PrimeFactors](#primefactors), [Random](#random), [RandomBetween](#randombetween), [RandomUniform](#randomuniform)
 * **Scripting**: [CenterView](#centerview), [Delete](#delete), [SetAxesRatio](#setaxesratio), [SetColor](#setcolor), [SetCoords](#setcoords), [SetValue](#setvalue), [SetVisibleInView](#setvisibleinview), [StartAnimation](#startanimation), [UpdateConstruction](#updateconstruction), [ZoomIn](#zoomin), [ZoomOut](#zoomout)
 * **Special Objects**: [Image](#image)
 * **Statistics**: [FitLine](#fitline)
@@ -176,6 +177,266 @@ Examples:
 * `Tangent(A, f)`
 * `Tangent(y = 0, c)`
 
+## Functions & Calculus
+
+### Asymptote
+
+Asymptotes of a function (vertical, horizontal, oblique) or of a hyperbola, as a list of lines.
+
+* `Asymptote( <Function> )`
+* `Asymptote( <Conic> )`
+
+Examples:
+
+* `Asymptote((x^2 + 1) / (x - 1))  ->  {x = 1, y = x + 1}`
+* `Asymptote(x^2 / 4 - y^2 = 1)`
+
+### Curvature
+
+Curvature of the graph of f at the x-coordinate of a point.
+
+* `Curvature( <Point>, <Function> )`
+
+Examples:
+
+* `Curvature((0, 0), x^2)  ->  2`
+
+### Curve
+
+Parametric curve (x(t), y(t)) for t from a to b; polar curves via (r(t); t).
+
+* `Curve( <Expression>, <Expression>, <Parameter Variable>, <Start Value>, <End Value> )`
+
+Examples:
+
+* `Curve(cos(t), sin(t), t, 0, 2π)`
+* `Curve(3cos(t) t / 6, 3sin(t) t / 6, t, 0, 6π)`
+
+### Derivative
+
+Derivative of a function (also written f', f''); partial derivative by a variable; of a curve.
+
+* `Derivative( <Function> )`
+* `Derivative( <Function>, <Number of Derivatives> )`
+* `Derivative( <Function>, <Variable> )`
+* `Derivative( <Function>, <Variable>, <Number of Derivatives> )`
+* `Derivative( <Curve> )`
+
+Examples:
+
+* `Derivative(x^3)  ->  3x²`
+* `f'(x)`
+* `Derivative(f, 2)`
+* `Derivative(x^2 y, y)`
+
+### Extremum
+
+Local maxima and minima: all of a polynomial, or of any function between two x-values.
+
+* `Extremum( <Polynomial> )`
+* `Extremum( <Polynomial>, <Index> )`
+* `Extremum( <Function>, <Start x-Value>, <End x-Value> )`
+* `Extremum( <Function>, <Start x-Value>, <End x-Value>, <Index> )`
+
+Examples:
+
+* `Extremum(x^3 - 3x)`
+* `Extremum(sin(x), 0, 7)`
+
+### FitPoly
+
+Least-squares polynomial of the given degree through a list of points.
+
+* `FitPoly( <List of Points>, <Degree> )`
+
+Examples:
+
+* `FitPoly({(0, 1), (1, 2), (2, 5), (3, 10)}, 2)`
+
+### Function
+
+A function restricted to the interval from a to b (undefined outside).
+
+* `Function( <Function>, <Start x-Value>, <End x-Value> )`
+
+Examples:
+
+* `Function(x^2, -1, 2)`
+
+### ImplicitCurve
+
+The curve f(x, y) = 0.
+
+* `ImplicitCurve( <f(x, y)> )`
+
+Examples:
+
+* `ImplicitCurve(x^3 + y^3 - 3x y)`
+
+### InflectionPoint
+
+Inflection points of a polynomial (where the curvature changes sign).
+
+Also available as: `TurningPoint`
+
+* `InflectionPoint( <Polynomial> )`
+* `InflectionPoint( <Polynomial>, <Index> )`
+
+Examples:
+
+* `InflectionPoint(x^3 - 3x^2)  ->  (1, -2)`
+
+### Integral
+
+Antiderivative of a function, or the definite integral from a to b (shown as a shaded area).
+
+* `Integral( <Function> )`
+* `Integral( <Function>, <Start x-Value>, <End x-Value> )`
+
+Examples:
+
+* `Integral(x^2)  ->  x³ / 3`
+* `Integral(f, 0, 2)`
+
+### IntegralBetween
+
+Integral of f - g from a to b (the area between the graphs, shaded).
+
+* `IntegralBetween( <Function>, <Function>, <Start x-Value>, <End x-Value> )`
+
+Examples:
+
+* `IntegralBetween(f, g, 0, 2)`
+
+### Limit
+
+Limit of a function at a value (use ∞ or -∞ for the ends of the axis).
+
+* `Limit( <Function>, <Value> )`
+
+Examples:
+
+* `Limit(sin(x) / x, 0)  ->  1`
+* `Limit((2x + 1) / (x - 3), ∞)  ->  2`
+
+### LimitAbove
+
+Limit from the right.
+
+* `LimitAbove( <Function>, <Value> )`
+
+Examples:
+
+* `LimitAbove(1 / x, 0)  ->  ∞`
+
+### LimitBelow
+
+Limit from the left.
+
+* `LimitBelow( <Function>, <Value> )`
+
+Examples:
+
+* `LimitBelow(1 / x, 0)  ->  -∞`
+
+### NIntegral
+
+Numeric value of the integral of f from a to b (no shading).
+
+* `NIntegral( <Function>, <Start x-Value>, <End x-Value> )`
+
+Examples:
+
+* `NIntegral(e^(-x^2), -1, 1)`
+
+### NSolve
+
+Numeric solutions of an equation in x (all real ones for polynomials, otherwise those between -100 and 100), or the one near a start value.
+
+Also available as: `NSolutions`
+
+* `NSolve( <Equation> )`
+* `NSolve( <Equation>, <Start> )`
+
+Examples:
+
+* `NSolve(x^2 = 2)  ->  {-1.41, 1.41}`
+* `NSolve(cos(x) = x)`
+* `NSolve(e^x = 3 - x, x = 1)`
+
+### OsculatingCircle
+
+The circle that best fits the graph of f at the x-coordinate of a point.
+
+* `OsculatingCircle( <Point>, <Function> )`
+
+Examples:
+
+* `OsculatingCircle((0, 0), x^2)`
+
+### Polynomial
+
+Expanded form of a polynomial function, or the polynomial through a list of points.
+
+* `Polynomial( <Function> )`
+* `Polynomial( <List of Points> )`
+
+Examples:
+
+* `Polynomial((x - 1)(x + 2))  ->  x² + x - 2`
+* `Polynomial({(0, 1), (1, 0), (2, 3)})`
+
+### Root
+
+Roots of a function: all roots of a polynomial, the root near a start value, or the root between two x-values.
+
+* `Root( <Polynomial> )`
+* `Root( <Function>, <Initial x-Value> )`
+* `Root( <Function>, <Start x-Value>, <End x-Value> )`
+
+Examples:
+
+* `Root(x^3 - x)`
+* `Root(cos(x), 1)`
+* `Root(cos(x), 0, 3)`
+
+### Roots
+
+All roots of a function between two x-values (or the n-th root of a polynomial).
+
+* `Roots( <Function>, <Start x-Value>, <End x-Value> )`
+* `Roots( <Function>, <Start x-Value>, <End x-Value>, <Index> )`
+* `Roots( <Polynomial>, <Index> )`
+
+Examples:
+
+* `Roots(sin(x), -5, 5)`
+* `Roots(x^2 - 4, 2)  ->  (2, 0)`
+
+### SolveODE
+
+Numeric solution of y' = f(x, y) from a start point to an end x (a curve of points).
+
+* `SolveODE( <f'(x, y)>, <Start x>, <Start y>, <End x>, <Step> )`
+* `SolveODE( <f'(x, y)>, <Start Point>, <End x> )`
+
+Examples:
+
+* `SolveODE(x y, 0, 1, 2, 0.01)`
+* `SolveODE(-y, (0, 2), 5)`
+
+### TaylorPolynomial
+
+Taylor polynomial of f around x = a up to the given order.
+
+Also available as: `TaylorSeries`, `Taylor`
+
+* `TaylorPolynomial( <Function>, <x-Value>, <Order> )`
+
+Examples:
+
+* `TaylorPolynomial(sin(x), 0, 5)  ->  x - x³/6 + x⁵/120`
+
 ## Geometry
 
 ### Angle
@@ -275,6 +536,9 @@ Intersection points of two objects. Without an index, objects with several inter
 
 * `Intersect( <Object>, <Object> )`
 * `Intersect( <Object>, <Object>, <Index of Intersection Point> )`
+* `Intersect( <Object>, <Object>, <Initial Point> )`
+* `Intersect( <Function>, <Object>, <Start x-Value>, <End x-Value> )`
+* `Intersect( <Function>, <Object>, <Start x-Value>, <End x-Value>, <Index> )`
 
 Examples:
 
@@ -756,6 +1020,36 @@ Examples:
 
 * `Div(17, 5)  ->  3`
 
+### Divisors
+
+Number of divisors of a whole number.
+
+* `Divisors( <Integer> )`
+
+Examples:
+
+* `Divisors(12)  ->  6`
+
+### DivisorsList
+
+All divisors of a whole number.
+
+* `DivisorsList( <Integer> )`
+
+Examples:
+
+* `DivisorsList(12)  ->  {1, 2, 3, 4, 6, 12}`
+
+### DivisorsSum
+
+Sum of all divisors of a whole number.
+
+* `DivisorsSum( <Integer> )`
+
+Examples:
+
+* `DivisorsSum(12)  ->  28`
+
 ### GCD
 
 Greatest common divisor of whole numbers.
@@ -767,6 +1061,16 @@ Examples:
 
 * `GCD(12, 18)  ->  6`
 * `GCD({12, 18, 30})  ->  6`
+
+### IsPrime
+
+true if the whole number is a prime.
+
+* `IsPrime( <Integer> )`
+
+Examples:
+
+* `IsPrime(97)  ->  true`
 
 ### LCM
 
@@ -814,6 +1118,36 @@ Examples:
 
 * `Mod(17, 5)  ->  2`
 * `Mod(-7, 3)  ->  2`
+
+### NextPrime
+
+The smallest prime greater than the number.
+
+* `NextPrime( <Number> )`
+
+Examples:
+
+* `NextPrime(10)  ->  11`
+
+### PreviousPrime
+
+The largest prime smaller than the number (undefined below 3).
+
+* `PreviousPrime( <Number> )`
+
+Examples:
+
+* `PreviousPrime(10)  ->  7`
+
+### PrimeFactors
+
+Prime factors of a whole number, with repetition.
+
+* `PrimeFactors( <Integer> )`
+
+Examples:
+
+* `PrimeFactors(360)  ->  {2, 2, 2, 3, 3, 5}`
 
 ### Random
 

@@ -8,7 +8,7 @@ with it; dragging the point projects the mouse onto the path. Parameters:
 * Circle, ellipse: angle 0..2pi;  hyperbola, parabola: see core.conics
 * Arc: 0..1 from start to end
 * Polygon: 0..n (edge k from vertex k to k+1);  Polyline: 0..n-1
-* Function graph: t = x
+* Function graph: t = x;  parametric curve: its own parameter (t_min..t_max)
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from pykaufgeo.core.values import (
     ArcValue,
     Circle,
     Conic,
+    CurveValue,
     FunctionValue,
     Line,
     LocusValue,
@@ -33,7 +34,7 @@ from pykaufgeo.core.values import (
     Segment,
 )
 
-PATH_TYPES = (Line, Segment, Ray, Circle, Conic, ArcValue, Polygon, Polyline, FunctionValue, LocusValue)
+PATH_TYPES = (Line, Segment, Ray, Circle, Conic, ArcValue, Polygon, Polyline, FunctionValue, LocusValue, CurveValue)
 
 
 def is_path(v: Any) -> bool:
@@ -63,10 +64,24 @@ def _edges(vertices: tuple[Point, ...], closed: bool) -> list[tuple[Point, Point
     return [(vertices[k], vertices[(k + 1) % n]) for k in range(n if closed else n - 1)]
 
 
+def _curve_xy(v: CurveValue, t: Any) -> tuple[Any, Any]:
+    from pykaufgeo.engine.numeric import compile_expr
+
+    fx = compile_expr(v.components[0], (v.param,))
+    fy = compile_expr(v.components[1], (v.param,))
+    with np.errstate(all="ignore"):
+        return fx(t), fy(t)
+
+
 def point_at(v: Any, t: float) -> Point:
     """The path point for parameter ``t`` (undefined point if impossible)."""
     if not math.isfinite(t):
         return Point(math.nan, math.nan)
+    if isinstance(v, CurveValue):
+        if len(v.components) != 2:
+            return Point(math.nan, math.nan)
+        x, y = _curve_xy(v, min(max(t, v.t_min), v.t_max))
+        return Point(float(np.real(x)), float(np.real(y)))
     if isinstance(v, Line):
         x0, y0, ux, uy = _line_frame(v)
         return Point(x0 + t * ux, y0 + t * uy)
@@ -109,6 +124,20 @@ def point_at(v: Any, t: float) -> Point:
 
 def project(v: Any, x: float, y: float) -> float:
     """Parameter of the path point closest to (x, y)."""
+    if isinstance(v, CurveValue):
+        ts = np.linspace(v.t_min, v.t_max, 801)
+        cx, cy = _curve_xy(v, ts)
+        d = (np.asarray(cx, dtype=float) * np.ones_like(ts) - x) ** 2 + \
+            (np.asarray(cy, dtype=float) * np.ones_like(ts) - y) ** 2
+        if not np.isfinite(d).any():
+            return v.t_min
+        k = int(np.nanargmin(d))
+        lo, hi = ts[max(k - 1, 0)], ts[min(k + 1, len(ts) - 1)]
+        from scipy.optimize import minimize_scalar
+
+        res = minimize_scalar(lambda t: float((np.real(_curve_xy(v, t)[0]) - x) ** 2 + (np.real(_curve_xy(v, t)[1]) - y) ** 2),
+                              bounds=(lo, hi), method="bounded")
+        return float(res.x) if res.success else float(ts[k])
     if isinstance(v, Line):
         x0, y0, ux, uy = _line_frame(v)
         return (x - x0) * ux + (y - y0) * uy
@@ -156,6 +185,8 @@ def project(v: Any, x: float, y: float) -> float:
 
 def sample_params(v: Any, n: int) -> np.ndarray:
     """Parameters spread over the whole path (infinite paths are compressed with tan)."""
+    if isinstance(v, CurveValue):
+        return np.linspace(v.t_min, v.t_max, n)
     if isinstance(v, (Circle,)):
         return np.linspace(0, 2 * math.pi, n)
     if isinstance(v, Conic):
@@ -183,6 +214,8 @@ def sample_params(v: Any, n: int) -> np.ndarray:
 
 def default_param(v: Any) -> float:
     """Where a new point on the path goes when no position is given."""
+    if isinstance(v, CurveValue):
+        return v.t_min
     if isinstance(v, Segment) or isinstance(v, ArcValue):
         return 0.5
     if isinstance(v, (Polygon, Polyline)):
@@ -194,6 +227,8 @@ def default_param(v: Any) -> float:
 
 def param_range(v: Any) -> tuple[float, float, bool]:
     """(t0, t1, closed) of a path's parameter; infinite ends for lines, rays, graphs, parabolas."""
+    if isinstance(v, CurveValue):
+        return (v.t_min, v.t_max, False)
     if isinstance(v, Circle):
         return (0.0, 2 * math.pi, True)
     if isinstance(v, Conic):

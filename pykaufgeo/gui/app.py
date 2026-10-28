@@ -106,6 +106,9 @@ def run(argv: list[str] | None = None) -> int:
 
     win = MainWindow()
     win.show()
+    from pykaufgeo.engine.sym_bridge import preload
+
+    preload()  # sympy takes seconds to import; the first derivative should not wait for it
     if files:
         win.file_open(files[0])
     elif demo is not None:

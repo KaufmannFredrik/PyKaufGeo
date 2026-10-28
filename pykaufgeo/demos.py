@@ -25,6 +25,7 @@ class Demo:
     lines: tuple[str, ...]          # input-bar lines, in order
     setup: Callable[[Construction], None] | None = None
     views: tuple[str, ...] = field(default_factory=tuple)  # extra panels to show
+    window: tuple[float, float, float, float] | None = None  # x min, y min, x max, y max (else Show All)
 
 
 # ----------------------------------------------------------------------- M1
@@ -87,7 +88,30 @@ M3 = Demo(
 )
 
 
-DEMOS: dict[str, Demo] = {d.key: d for d in (M1, M2, M3)}
+# ----------------------------------------------------------------------- M4
+
+def _m4_setup(c: Construction) -> None:
+    c.set_style("f'", line_style="dash")
+    c.set_style("I", opacity=0.35)
+
+
+M4 = Demo(
+    "m4", "M4: Calculus, curves, regions",
+    "Drag the slider a: f, its derivative f' (dashed), the roots, extrema and the shaded integral follow. "
+    "Type Derivative(f), Integral(f), Limit(sin(x) / x, 0) or NSolve(cos(x) = x) in the input bar; "
+    "try the Roots, Extremum and Function Inspector tools, and sketch a graph with Freehand Shape.",
+    (
+        "a = Slider(-2, 2, 0.1)", "f(x) = x^3 / 4 - x + a", "f'", "Root(f)", "Extremum(f)", "I = Integral(f, -2, 0)",
+        "ic = Translate(ImplicitCurve(x^3 + y^3 - 6x y), Vector((-11, -2)))",
+        "r: (x - 9)^2 + (y + 1)^2 < 9 && y > x - 10",
+        "k = Curve(t cos(t) / 4 + 8, t sin(t) / 4 + 5, t, 0, 5π)",
+    ),
+    _m4_setup,
+    window=(-13.0, -7.0, 13.0, 9.0),
+)
+
+
+DEMOS: dict[str, Demo] = {d.key: d for d in (M1, M2, M3, M4)}
 LATEST = list(DEMOS)[-1]
 
 

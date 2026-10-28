@@ -485,14 +485,18 @@ class MainWindow(QMainWindow):
             self.set_view_visible(view, True)
         self._demo = demo.title
         self._update_title()
-        QTimer.singleShot(0, self._frame_demo)
+        QTimer.singleShot(0, lambda: self._frame_demo(demo.window))
         self.message.show_message("info", tr(demo.hint))
         return True
 
-    def _frame_demo(self) -> None:
-        """Show every object once the panels have their final size (not an undo step)."""
+    def _frame_demo(self, window: tuple[float, float, float, float] | None = None) -> None:
+        """Frame the demo once the panels have their final size (not an undo step)."""
         for canvas in self.canvases:
-            if canvas.isVisible():
+            if not canvas.isVisible():
+                continue
+            if window is not None and canvas is self.graphics.canvas:
+                canvas.set_viewport(canvas.vp.zoomed_to(*window, keep_ratio=True))
+            else:
                 canvas.show_all()
 
     def _update_title(self) -> None:

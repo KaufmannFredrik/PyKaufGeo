@@ -216,7 +216,7 @@ ROUND_TRIP = [
     "1 + 2 * 3", "(1 + 2) * 3", "2^3^2", "(2^3)^2", "-x^2", "(-x)^2", "2^(-x)", "a - (b - c)",
     "a / (b / c)", "x y", "2(x + 1)", "sin(x)^2", "|x - 1|", "(1, 2)", "(2; 30°)", "{1, {2, 3}}",
     "\"hi \\\"there\\\"\"", "1 < x <= 3", "y = 2x + 1", "a && b || !c", "3!", "(x + 1)!", "Sum(k^2, k, 1, 5)",
-    "Derivative(f)(2)", "If(x < 0, -x, x)", "0.1 + 0.2", "1e-05", "?", "true", "x^2 + y^2 = 4",
+    "First(L)(2)", "If(x < 0, -x, x)", "0.1 + 0.2", "1e-05", "?", "true", "x^2 + y^2 = 4",
     "-(-2)", "- -x", "a ⊗ b",
 ]
 
@@ -234,3 +234,16 @@ def test_to_display_is_pretty() -> None:
     assert to_display(parse_expression("pi*r^2")) == "π r²"
     assert to_display(parse_expression("1/3"), 2) == "1 / 3"
     assert to_display(Num(1 / 3), 2) == "0.33"
+
+
+def test_derivatives_print_with_primes() -> None:
+    """Derivative(f) is written f' (and read back as Derivative(f) when f is a function)."""
+    from pykaufgeo.core.construction import Construction
+
+    c = Construction()
+    c.execute("f(x) = x^3")
+    assert to_input(parse_expression("Derivative(f)(2)")) == "f'(2)"
+    assert to_input(parse_expression("Derivative(f, 2)")) == "f''"
+    assert to_input(parse_expression("Derivative(f, 7)")) == "Derivative(f, 7)"
+    label = c.execute("g(x) = Derivative(f)(x) + 1")[0]
+    assert c[label].definition == "f'(x) + 1" and c[label].value(2) == 13

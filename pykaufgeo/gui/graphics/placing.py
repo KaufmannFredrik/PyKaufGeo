@@ -11,11 +11,12 @@ from pykaufgeo import theme
 from pykaufgeo.core import paths
 from pykaufgeo.core import values as V
 from pykaufgeo.core.errors import PKGError
+from pykaufgeo.parser.unparse import format_float_input as num
 
 if TYPE_CHECKING:
     from pykaufgeo.gui.graphics.canvas import GraphicsCanvas
 
-INTERSECTABLE = (V.Line, V.Segment, V.Ray, V.Circle, V.Conic, V.ArcValue, V.Polygon, V.Polyline)
+INTERSECTABLE = (V.Line, V.Segment, V.Ray, V.Circle, V.Conic, V.ArcValue, V.Polygon, V.Polyline, V.FunctionValue)
 
 
 def path_hits(canvas: "GraphicsCanvas", pos: QPointF, hits: list[str]) -> list[str]:
@@ -41,10 +42,21 @@ def intersection_near(canvas: "GraphicsCanvas", pos: QPointF, a: str, b: str) ->
     c = canvas.document.construction
     if not (isinstance(c[a].value, INTERSECTABLE) and isinstance(c[b].value, INTERSECTABLE)):
         return None
+    wx, wy = canvas.world(pos)
+    near = f"Intersect({a}, {b}, ({num(wx)}, {num(wy)}))"
     try:
         result = c.evaluate_text(f"Intersect({a}, {b})")
     except PKGError:
-        return None
+        # graphs that are not polynomials: the crossing found from the cursor (Newton)
+        try:
+            p = c.evaluate_text(near)
+        except PKGError:
+            return None
+        if not (isinstance(p, V.Point) and p.is_defined()):
+            return None
+        if math.hypot(canvas.vp.sx(p.x) - pos.x(), canvas.vp.sy(p.y) - pos.y()) > theme.HIT_TOLERANCE * 2:
+            return None
+        return c.execute(near)[0]
     points = result.values if isinstance(result, V.MultiOutput) else (result,)
     best, best_k = math.inf, None
     for k, p in enumerate(points, start=1):

@@ -155,6 +155,11 @@ class _Latex:
         raise TypeError(f"cannot render {node!r}")
 
     def call(self, node: Call) -> str:
+        from pykaufgeo.engine.resolver import prime_name
+
+        primed = prime_name(node)
+        if primed is not None:
+            return primed
         name, args = node.name, node.args
         if name == "sqrt" and len(args) == 1:
             return r"\sqrt{" + self.p(args[0]) + "}"

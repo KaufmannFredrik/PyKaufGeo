@@ -93,6 +93,11 @@ def _compile(node: Node, index: dict[str, int]) -> Fn:  # noqa: C901 - dispatch
         return lambda a: math.nan
     if isinstance(node, Ident):
         if node.name not in index:
+            from pykaufgeo.engine.builtins import CONSTANTS
+
+            const = CONSTANTS.get(node.name)
+            if isinstance(const, (int, float, complex)):  # e, π, i in symbolic results
+                return lambda a: const
             raise EvalError(f"Undefined variable: {node.name}")
         k = index[node.name]
         return lambda a: a[k]

@@ -46,6 +46,19 @@ class Angle(float):
         return f"Angle({float(self)!r})"
 
 
+class AreaValue(float):
+    """A definite integral: the number, plus what the Graphics view shades
+    (``f`` from ``a`` to ``b``, down to ``g`` or to the x-axis)."""
+
+    def __new__(cls, value: float, f: Any, a: float, b: float, g: Any = None) -> "AreaValue":
+        obj = float.__new__(cls, value)
+        obj.f, obj.a, obj.b, obj.g = f, a, b, g
+        return obj
+
+    def __repr__(self) -> str:
+        return f"AreaValue({float(self)!r}, a={self.a!r}, b={self.b!r})"
+
+
 def _finite(*xs: float) -> bool:
     return all(math.isfinite(x) for x in xs)
 

@@ -466,11 +466,13 @@ class StrokeTool(_ActionTool):
         con = self.c.document.construction
         shape = recognise(sx, sy)
         if shape is None:
-            self.c.message.emit("info", tr("Not recognised: draw a circle, a straight segment or a polygon. "
-                                           "Freehand function graphs arrive in M4."))
+            self.c.message.emit("info", tr("Not recognised: draw a function graph (left to right), a circle, "
+                                           "a straight segment or a polygon."))
             return []
         kind, pts = shape
         world = self._world(np.array([p[0] for p in pts]), np.array([p[1] for p in pts]))
+        if kind == "function":
+            return con.execute(self._sketched_function(world))
         if kind == "circle":
             (cx, cy), (ex, ey) = world
             centre = con.execute(_pt(cx, cy))[0]
@@ -480,6 +482,23 @@ class StrokeTool(_ActionTool):
         if kind == "segment":
             return vertices + con.execute(f"Segment({vertices[0]}, {vertices[1]})")
         return vertices + con.execute("Polygon(" + ", ".join(vertices) + ")")
+
+    def _sketched_function(self, world: list[tuple[float, float]]) -> str:
+        """Function(<polynomial>, x0, x1): the lowest degree (up to 6) that follows the sketch within 3 px."""
+        from pykaufgeo.engine.analysis import poly_node
+        from pykaufgeo.parser.unparse import to_input
+
+        xs = np.array([p[0] for p in world])
+        ys = np.array([p[1] for p in world])
+        yscale = self.c.vp.yscale
+        coeffs = np.polyfit(xs, ys, 1)
+        for deg in range(1, 7):
+            coeffs = np.polyfit(xs, ys, deg)
+            if float(np.sqrt(np.mean((np.polyval(coeffs, xs) - ys) ** 2))) * yscale <= 3.0:
+                break
+        coeffs = np.array([float(f"{c:.4g}") for c in coeffs])
+        x0, x1 = sorted((float(xs[0]), float(xs[-1])))
+        return f"Function({to_input(poly_node(coeffs))}, {num(round(x0, 2))}, {num(round(x1, 2))})"
 
     def cancel(self) -> None:
         self.stroke = []
@@ -515,7 +534,8 @@ def simplify(sx: np.ndarray, sy: np.ndarray, tol: float) -> np.ndarray:
 
 
 def recognise(sx: np.ndarray, sy: np.ndarray) -> tuple[str, list[tuple[float, float]]] | None:
-    """('circle', [centre, point on circle]), ('segment', [a, b]) or ('polygon', vertices) in screen px."""
+    """('circle', [centre, point on circle]), ('segment', [a, b]), ('polygon', vertices) or
+    ('function', stroke points) in screen px."""
     length = float(np.sum(np.hypot(np.diff(sx), np.diff(sy))))
     if length < theme.MIN_HIT:
         return None
@@ -526,6 +546,11 @@ def recognise(sx: np.ndarray, sy: np.ndarray) -> tuple[str, list[tuple[float, fl
         keep = simplify(sx, sy, 0.06 * max(chord, 1.0))
         if len(keep) == 2 and chord > 0.8 * length:
             return ("segment", [(float(sx[0]), float(sy[0])), (float(sx[-1]), float(sy[-1]))])
+        # a graph: drawn left to right (or right to left) without turning back
+        dx = np.diff(sx)
+        forward = max(np.sum(dx > 0), np.sum(dx < 0)) / max(np.sum(dx != 0), 1)
+        if forward >= 0.95 and float(np.ptp(sx)) >= 3 * theme.MIN_HIT:
+            return ("function", [(float(x), float(y)) for x, y in zip(sx, sy)])
         return None
     # circle: algebraic least squares x² + y² + D x + E y + F = 0
     A = np.column_stack([sx, sy, np.ones_like(sx)])

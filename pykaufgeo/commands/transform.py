@@ -19,7 +19,10 @@ from pykaufgeo.core.values import (
     ArcValue,
     Circle,
     Conic,
+    CurveValue,
     FunctionValue,
+    ImplicitValue,
+    InequalityValue,
     Line,
     ListValue,
     LocusValue,
@@ -32,7 +35,7 @@ from pykaufgeo.core.values import (
     Vector,
 )
 from pykaufgeo.engine.symbolic import substitute
-from pykaufgeo.parser.ast import Binary, Ident, Num
+from pykaufgeo.parser.ast import Binary, Ident, Node, Num, Unary
 
 CAT = "Transformations"
 
@@ -133,10 +136,48 @@ def apply(T: Affine, v: Any) -> Any:  # noqa: C901 - dispatch on value type
     if isinstance(v, FunctionValue):
         if T.b == 0 and T.c == 0 and T.a == 1 and T.d == 1:
             return translate_function(v, T.e, T.f)
-        raise CommandError("Only Translate works on functions so far; other maps of graphs need curves (M4).")
+        if len(v.params) != 1:
+            raise CommandError("Only functions of one variable can be transformed.")
+        # any other map turns the graph into a curve (t, f(t))
+        t = "t" if v.params[0] != "t" else "s"
+        graph = CurveValue(t, (Ident(t), substitute(v.body, {v.params[0]: Ident(t)})), GRAPH_T_MIN, GRAPH_T_MAX)
+        return apply(T, graph)
+    if isinstance(v, CurveValue):
+        x, y = v.components[0], v.components[1]
+        return CurveValue(v.param, (_affine_node(T.a, T.b, T.e, x, y), _affine_node(T.c, T.d, T.f, x, y)),
+                          v.t_min, v.t_max)
+    if isinstance(v, (ImplicitValue, InequalityValue)):
+        # the image of {F(x, y) = 0} is {F(T⁻¹(x, y)) = 0}
+        inv = np.linalg.inv(T.matrix())
+        xi = _affine_node(inv[0, 0], inv[0, 1], inv[0, 2], Ident("x"), Ident("y"))
+        yi = _affine_node(inv[1, 0], inv[1, 1], inv[1, 2], Ident("x"), Ident("y"))
+        sub = {"x": xi, "y": yi}
+        if isinstance(v, ImplicitValue):
+            return ImplicitValue(substitute(v.lhs, sub), substitute(v.rhs, sub))
+        return InequalityValue(substitute(v.expr, sub), ("x", "y"))
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         return v  # numbers (and angles) are unchanged by geometric maps
     raise CommandError(f"Cannot transform a {type(v).__name__}.")
+
+
+GRAPH_T_MIN, GRAPH_T_MAX = -100.0, 100.0  # parameter range of a transformed function graph
+
+
+def _affine_node(a: float, b: float, e: float, x: Node, y: Node) -> Node:
+    """a x + b y + e as an expression (zero terms left out, signs written as - )."""
+    terms: list[tuple[float, Node | None]] = [(float(c), n) for c, n in ((a, x), (b, y), (e, None))
+                                              if abs(c) >= 1e-14]
+    if not terms:
+        return Num(0.0)
+    out: Node | None = None
+    for coef, node in terms:
+        mag = abs(coef)
+        body: Node = Num(mag) if node is None else (node if abs(mag - 1) < 1e-15 else Binary("*", Num(mag), node))
+        if out is None:
+            out = Unary("-", body) if coef < 0 else body
+        else:
+            out = Binary("-" if coef < 0 else "+", out, body)
+    return out
 
 
 def _conic(T: Affine, coeffs: tuple[float, ...]) -> Conic:

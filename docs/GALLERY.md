@@ -13,6 +13,23 @@ dist/PyKaufGeo.exe --demo         # the built program (python build.py)
 
 or use Help > Milestone Demos in the app. Demos open unsaved; nothing is overwritten.
 
+## M4: Calculus/analysis commands, implicit and parametric curves, inequalities
+
+**Try it:** `python -m pykaufgeo --demo m4`. Drag the slider a: f, its derivative f' (dashed), the roots, extrema and the shaded integral follow. Type Derivative(f), Integral(f), Limit(sin(x) / x, 0) or NSolve(cos(x) = x) in the input bar; try the Roots, Extremum and Function Inspector tools, and sketch a graph with Freehand Shape.
+
+![M4 demo](screenshots/demo_m4.png)
+
+<details>
+<summary>Design review screenshots (9)</summary>
+
+<table>
+<tr><td><a href="screenshots/m4_dialog_function_inspector.png"><img src="screenshots/m4_dialog_function_inspector.png" width="280"></a><br><code>m4_dialog_function_inspector</code></td><td><a href="screenshots/m4_dialog_function_inspector_points.png"><img src="screenshots/m4_dialog_function_inspector_points.png" width="280"></a><br><code>m4_dialog_function_inspector_points</code></td><td><a href="screenshots/m4_font_20pt.png"><img src="screenshots/m4_font_20pt.png" width="280"></a><br><code>m4_font_20pt</code></td></tr>
+<tr><td><a href="screenshots/m4_freehand_sketch.png"><img src="screenshots/m4_freehand_sketch.png" width="280"></a><br><code>m4_freehand_sketch</code></td><td><a href="screenshots/m4_high_contrast.png"><img src="screenshots/m4_high_contrast.png" width="280"></a><br><code>m4_high_contrast</code></td><td><a href="screenshots/m4_main.png"><img src="screenshots/m4_main.png" width="280"></a><br><code>m4_main</code></td></tr>
+<tr><td><a href="screenshots/m4_night.png"><img src="screenshots/m4_night.png" width="280"></a><br><code>m4_night</code></td><td><a href="screenshots/m4_regions.png"><img src="screenshots/m4_regions.png" width="280"></a><br><code>m4_regions</code></td><td><a href="screenshots/m4_regions_night.png"><img src="screenshots/m4_regions_night.png" width="280"></a><br><code>m4_regions_night</code></td></tr>
+</table>
+
+</details>
+
 ## M3: Full tool set, transformations, conics, polygons, locus, sliders, animation, styling, properties
 
 **Try it:** `python -m pykaufgeo --demo m3`. Drag M along its circle (Q draws the magenta locus), P along the ellipse (the tangent follows) or A (the triangle and its mirror image change). Press PLAY in the view bar or drag the slider r. Right-click an object for its menu, Ctrl+E for Properties, and try the tools.

@@ -26,7 +26,7 @@ from pykaufgeo.render.clip import line_on_screen, ray_on_screen, segment_on_scre
 from pykaufgeo.render.sampling import sample_function
 from pykaufgeo.render.viewport import Viewport
 
-KIND_ORDER = {"image": -1, "fill": 0, "curve": 1, "vector": 2, "text": 3, "slider": 4, "point": 5}
+KIND_ORDER = {"image": -1, "region": 0, "fill": 0, "curve": 1, "vector": 2, "text": 3, "slider": 4, "point": 5}
 SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 OFFSCREEN_MARGIN = 60.0
 
@@ -56,10 +56,22 @@ class Drawable:
     font: QFont | None = None
     pixmap: QPixmap | None = None
     ghost: bool = False             # hidden object shown faintly by the Show / Hide Object tool
+    mask: Any = None                # inequality regions: inside/outside on a grid of ``cell`` pixels
+    cell: float = 0.0
     _hit: QPainterPath | None = None
 
     def hit_distance(self, x: float, y: float) -> float | None:
         """Pixel distance to the object if within pick tolerance, else None."""
+        if self.kind == "region" and self.mask is not None:
+            if self.path is not None and self._hit is None:
+                stroker = QPainterPathStroker()
+                stroker.setWidth(self.width + 2 * theme.HIT_TOLERANCE)
+                self._hit = stroker.createStroke(self.path)
+            if self._hit is not None and self._hit.contains(QPointF(x, y)):
+                return 1.0
+            iy, ix = int(round(y / self.cell)), int(round(x / self.cell))
+            inside = 0 <= iy < self.mask.shape[0] and 0 <= ix < self.mask.shape[1] and bool(self.mask[iy, ix])
+            return float(theme.HIT_TOLERANCE) if inside else None
         if self.kind in ("text", "image"):
             pad = theme.TEXT_PAD
             return 1.0 if self.rect is not None and self.rect.adjusted(-pad, -pad, pad, pad).contains(x, y) else None
@@ -265,15 +277,27 @@ def make_drawable(el: GeoElement, vp: Viewport, colors: theme.ThemeColors, squar
                   decimals: int, ctx: SceneContext | None = None) -> Drawable | None:
     from pykaufgeo.gui.graphics import shapes
 
+    from pykaufgeo.gui.graphics import shapes_analysis as sa
+
     v: Any = el.value
     if el.extras:
         if el.extras.get("slider") is not None or el.extras.get("triangle"):
             return shapes.make_extra(el, vp, colors, decimals, ctx or SceneContext())
+    if isinstance(v, V.AreaValue):
+        return sa.area(el, v, vp, colors, decimals)
+    if isinstance(v, V.CurveValue):
+        return sa.curve(el, v, vp, colors, decimals)
+    if isinstance(v, V.ImplicitValue):
+        return sa.implicit_curve(el, v, vp, colors, decimals)
+    if isinstance(v, V.InequalityValue):
+        return sa.region(el, v, vp, colors, decimals)
     if isinstance(v, (V.Point, complex)):
         x, y = (v.x, v.y) if isinstance(v, V.Point) else (v.real, v.imag)
         return _point(el, [(x, y)], vp, colors, square_points, decimals)
     if isinstance(v, V.ListValue) and v.items and all(isinstance(i, V.Point) for i in v.items):
         return _point(el, [(p.x, p.y) for p in v.items if p.is_defined()], vp, colors, square_points, decimals)
+    if isinstance(v, V.ListValue):
+        return sa.list_curves(el, v, vp, colors, square_points, decimals, ctx or SceneContext())
     if isinstance(v, V.Vector):
         return _vector(el, v, vp, colors, decimals)
     if isinstance(v, V.Line):
@@ -438,6 +462,10 @@ def world_bounds(construction: Construction, view_key: str) -> tuple[float, floa
                 pts = [conics.point_at(sh, 0.0)]
         elif isinstance(v, V.LocusValue):
             pts = [(q.x, q.y) for piece in v.pieces for q in piece[:: max(1, len(piece) // 20)]]
+        elif isinstance(v, V.CurveValue) and len(v.components) == 2:
+            from pykaufgeo.core import paths
+
+            pts = [(q.x, q.y) for q in (paths.point_at(v, t) for t in np.linspace(v.t_min, v.t_max, 60))]
         elif isinstance(v, (str, V.ImageValue)):  # placed texts and images (their anchor corner)
             anchor = el.extras.get("pos") or el.extras.get("corner")
             if isinstance(anchor, (list, tuple)) and len(anchor) == 2:

@@ -79,9 +79,9 @@ def test_hit_targets(qapp, light_theme) -> None:
 
 def test_tool_selection_marks_unimplemented(qapp, light_theme) -> None:
     win = make_window()
-    win.toolbar.select_tool("extremum")
-    assert win.toolbar.current_tool.id == "extremum"
-    assert win.toolbar.group_button("point").selected
+    win.toolbar.select_tool("checkbox")
+    assert win.toolbar.current_tool.id == "checkbox"
+    assert win.toolbar.group_button("action").selected
     assert not win.toolbar.group_button("move").selected
     assert win.message.isVisibleTo(win)
     assert win.message.property("kind") == "warning"

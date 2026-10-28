@@ -158,6 +158,11 @@ class _Printer:
         if isinstance(node, Equation):
             return f"{self.p(node.lhs)} = {self.p(node.rhs)}"
         if isinstance(node, Call):
+            from pykaufgeo.engine.resolver import prime_name
+
+            primed = prime_name(node)
+            if primed is not None:
+                return primed
             return f"{node.name}({', '.join(self.p(a) for a in node.args)})"
         if isinstance(node, Apply):
             callee = self.wrap(node.func, not isinstance(node.func, (Ident, Call, Apply)))

@@ -247,6 +247,22 @@ paintEvent: base layer + trace layer (D-311) + live drawables + halos + tool pre
 * `gui/animation.py`: `Animator` (D-310), driven by `AnimationCommand` events and the
   play button; `tick(dt)` is callable from tests.
 
+## Calculus, curves, regions (M4)
+
+* `engine/sym_bridge.py`: tree <-> sympy (`to_sympy`, `from_sympy`, `tidy`), lazy import
+  and background `preload()`, `limited(fn, seconds)` time limit (D-401).
+* `engine/analysis.py`: polynomial coefficients (`poly_coeffs`, `poly_node`), real roots,
+  roots / extrema in an interval, Newton, definite integrals.
+* `commands/calculus.py` (Derivative, Integral, Limit, Taylor, Asymptote, Polynomial,
+  FitPoly, Function, Curve, ImplicitCurve, Curvature, OsculatingCircle, SolveODE) and
+  `commands/analysis_cmds.py` (Root, Roots, Extremum, InflectionPoint, NSolve,
+  intersections with graphs). `Command.indexed()` names the k-th result (D-403).
+* `engine/resolver.py`: `f'` -> Derivative (D-402); `parser/unparse.py` and `latex.py`
+  print it back with primes.
+* `render/curves.py`, `render/implicit.py`, `render/regions.py` (Qt-free) and
+  `gui/graphics/shapes_analysis.py` (paths, region images); drawable kind `region`.
+* `gui/function_inspector.py`: the Function Inspector dialog.
+
 ## GUI (M0/M1)
 
 * `gui/app.py`: QApplication with Fusion, all UI effects off, font substitutions,

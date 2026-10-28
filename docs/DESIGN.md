@@ -343,3 +343,44 @@ Point size and style are disabled for a conic (they do not apply).
 #### Prompts (`m3_dialog_slider.png`, `m3_dialog_text.png`)
 ![slider dialog](screenshots/m3_dialog_slider.png)
 ![text dialog](screenshots/m3_dialog_text.png)
+
+## 8. M4: calculus, curves, regions
+
+### Rules
+
+* Regions: the object colour at the object's opacity (25 % by default), drawn as a
+  smoothed grid image; overlaps mix. Strict inequalities have a dashed boundary, ≤ and ≥
+  a solid one. Clicking inside a region selects it; the halo follows the boundary.
+* Shaded integrals: the integral colour token (blue) at 25 % with a 2 px ink edge.
+* Implicit curves use the implicit colour token (magenta, blue in high contrast);
+  parametric curves the curve token (blue).
+* Derivatives are written with primes (f′) in the Algebra view and in definitions.
+* Function Inspector: two tabs (INTERVAL, POINTS) with monospace tables; errors in a red
+  block; it follows the function while open.
+
+### Screenshots (M4)
+
+#### Main window (`screenshots/m4_main.png`)
+![m4 main](screenshots/m4_main.png)
+1. f (selected) with its derivative f′, roots A–C, extrema D and E, and the shaded
+   integral from -2 to 0.
+2. The Taylor polynomial of cos, the folium x³ + y³ = 6xy (magenta), a parametric curve
+   and the asymptotes x = 4, y = x + 4 of (x² + 1)/(x - 4).
+3. Algebra rows: f′(x) with a prime, `l = {x = 4, y = x + 4}`, `n = {0.74}` (a list of
+   numbers, nothing to draw).
+
+#### Regions (`m4_regions.png`, `m4_regions_night.png`)
+![regions](screenshots/m4_regions.png)
+Four overlapping regions; dashed boundaries for <, >, solid for ≥ ∧ ≤.
+![regions night](screenshots/m4_regions_night.png)
+
+#### Night, high contrast, 20 pt (`m4_night.png`, `m4_high_contrast.png`, `m4_font_20pt.png`)
+![m4 night](screenshots/m4_night.png)
+![m4 contrast](screenshots/m4_high_contrast.png)
+![m4 20pt](screenshots/m4_font_20pt.png)
+
+#### Function Inspector and freehand (`m4_dialog_function_inspector*.png`, `m4_freehand_sketch.png`)
+![inspector](screenshots/m4_dialog_function_inspector.png)
+![inspector points](screenshots/m4_dialog_function_inspector_points.png)
+![freehand](screenshots/m4_freehand_sketch.png)
+A sketch in progress (dashed); released, it becomes Function(<polynomial>, x0, x1).

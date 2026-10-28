@@ -14,6 +14,7 @@ from pykaufgeo.core.values import (
     ArcValue,
     Circle,
     Conic,
+    FunctionValue,
     Line,
     ListValue,
     MultiOutput,
@@ -127,7 +128,27 @@ class Intersect(Command):
     examples = ("Intersect(f, g)", "Intersect(c, f)", "Intersect(c, f, 1)")
     multi_output = True
 
+    @staticmethod
+    def _graphs(call, a: Any, b: Any) -> tuple[Any, Any, bool]:
+        """Expressions in x become functions; the function goes first."""
+        from pykaufgeo.engine.symbolic import Sym
+
+        from pykaufgeo.engine.symbolic import to_node
+
+        a, b = (call.finalize(v) if isinstance(v, Sym) else v for v in (a, b))
+        if isinstance(b, FunctionValue) and not isinstance(a, FunctionValue):
+            a, b = b, a
+        if isinstance(a, FunctionValue) and isinstance(b, (int, float)) and not isinstance(b, bool):
+            b = FunctionValue(("x",), to_node(float(b)))  # a number is the horizontal line y = number
+        return a, b, isinstance(a, FunctionValue)
+
     def all_points(self, a: Any, b: Any) -> tuple[Point, ...] | Point:
+        if isinstance(b, FunctionValue) and not isinstance(a, FunctionValue):
+            a, b = b, a
+        if isinstance(a, FunctionValue):
+            from pykaufgeo.commands.analysis_cmds import function_intersections
+
+            return function_intersections(a, b)
         linear = (Line, Segment, Ray)
         if isinstance(a, linear) and isinstance(b, linear):
             pt = intersect_lines(as_line(a), as_line(b))
@@ -152,19 +173,49 @@ class Intersect(Command):
             pts = [p for p in intersect_line_conic(as_line(a), full.coefficients())
                    if _param_ok(a, p) and _on_arc(b, p)]
             return _pad(pts, 2)
-        raise CommandError("Intersect of these object types arrives in M4 (functions, curves).")
+        raise CommandError("Intersect works for lines, segments, rays, circles, conics, arcs and function "
+                           "graphs; curves and implicit curves are not supported yet.")
 
     @sig("<Object>", "<Object>", returns=P)
     def pair(self, call, a: Any, b: Any) -> Any:
+        a, b, _ = self._graphs(call, a, b)
         res = self.all_points(a, b)
         if isinstance(res, Point):
             return res
         return MultiOutput(res)
 
     @sig("<Object>", "<Object>", "<Index of Intersection Point:Integer>", returns=P)
-    def indexed(self, call, a: Any, b: Any, k: int) -> Point:
+    def index_of(self, call, a: Any, b: Any, k: int) -> Point:
+        a, b, _ = self._graphs(call, a, b)
         res = self.all_points(a, b)
         pts = (res,) if isinstance(res, Point) else res
+        return pts[k - 1] if 1 <= k <= len(pts) else NAN_POINT
+
+    @sig("<Object>", "<Object>", "<Initial Point:Point>", returns=P)
+    def near(self, call, a: Any, b: Any, p: Point) -> Point:
+        """For function graphs: the intersection found from the x of the point (Newton)."""
+        a, b, graph = self._graphs(call, a, b)
+        if not graph:
+            res = self.all_points(a, b)
+            pts = [q for q in ((res,) if isinstance(res, Point) else res) if q.is_defined()]
+            return min(pts, key=lambda q: math.hypot(q.x - p.x, q.y - p.y)) if pts else NAN_POINT
+        from pykaufgeo.commands.analysis_cmds import function_intersection_near
+
+        return function_intersection_near(a, b, p.x)
+
+    @sig("<Function>", "<Object>", "<Start x-Value:Number>", "<End x-Value:Number>", returns=P)
+    def interval(self, call, f: Any, g: Any, x0: float, x1: float) -> Any:
+        from pykaufgeo.commands.analysis_cmds import function_intersections
+
+        f, g, _ = self._graphs(call, f, g)
+        return MultiOutput(function_intersections(f, g, (x0, x1)))
+
+    @sig("<Function>", "<Object>", "<Start x-Value:Number>", "<End x-Value:Number>", "<Index:Integer>", returns=P)
+    def interval_k(self, call, f: Any, g: Any, x0: float, x1: float, k: int) -> Point:
+        from pykaufgeo.commands.analysis_cmds import function_intersections
+
+        f, g, _ = self._graphs(call, f, g)
+        pts = function_intersections(f, g, (x0, x1))
         return pts[k - 1] if 1 <= k <= len(pts) else NAN_POINT
 
 
